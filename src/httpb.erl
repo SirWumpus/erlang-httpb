@@ -24,8 +24,8 @@
 -type headers()         :: map().
 -type reason()          :: term().
 -type error()           :: {error, reason()}.
--type scheme()		:: http | https.
--type method()		:: get | head | options | post | put | delete.
+-type scheme()          :: http | https.
+-type method()          :: get | head | options | post | put | delete.
 -type result()          :: #{status => integer(), headers => headers(), body => body()}.
 -type socket()          :: gen_tcp:socket() | ssl:sslsocket().
 -type connection()      :: #{scheme => scheme(), host => string() | binary(), port => non_neg_integer(), socket => socket()}.
@@ -57,7 +57,7 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
     ok ->
         case send(Conn, Body) of
         ok ->
-            setopts(Conn, [{packet, http_bin}]),
+            ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
             {ok, Conn};
         Other ->
             Other
@@ -198,27 +198,29 @@ response(Conn, Timeout) ->
 
 -spec response(Conn :: connection(), Timeout :: timeout(), Res :: result()) -> ret_result().
 response(Conn, Timeout, Res) ->
-    setopts(Conn, [{active, once}]),
     receive
     {_Type, _Socket, {http_response, _, Status, _}} ->
-	% _Type :: http | ssl
+        % _Type :: http | ssl
+        ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{status => Status});
     {_Type, _Socket, {http_header, _, Key, _, Value}} ->
         Key1 = field_to_atom(Key),
         Hdrs = maps:get(headers, Res),
+        ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{headers => Hdrs#{Key1 => Value}});
-    {_Type, _Socket, {http_error, Data}} ->
+    {_Type, _Socket, {http_error, Data}}  ->
         % Switching to raw packets can still result in some data.
         Body = maps:get(body, Res, <<>>),
+        ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{body => <<Body/binary, Data/binary>>});
     {_Type, _Socket, http_eoh} ->
         case is_chunked(Res) of
         false ->
-	    % Read as much of the body as possible.
-            setopts(Conn, [{packet, raw}]),
+            % Read as much of the body as possible.
+            ok = setopts(Conn, [{active, once}, {packet, raw}]),
             response(Conn, Timeout, Res);
         true ->
-       	    % Stop reading before first chunk.
+            % Stop reading before first chunk.
             {ok, Res}
         end;
     {ssl, _Socket, Data} ->
@@ -251,7 +253,7 @@ recv_chunk(Conn) ->
 
 -spec recv_chunk(Conn :: connection(), Timeout :: timeout()) -> ret_data().
 recv_chunk(Conn, Timeout) ->
-    setopts(Conn, [{active, once}, {packet, line}]),
+    ok = setopts(Conn, [{active, once}, {packet, line}]),
     receive
     {tcp_error, _Socket, Reason} ->
         close(Conn),
@@ -262,7 +264,7 @@ recv_chunk(Conn, Timeout) ->
     {tcp, _Socket, Line} ->
         Hex = string:trim(Line),
         Len = binary_to_integer(Hex, 16),
-        setopts(Conn, [{packet, raw}]),
+        ok = setopts(Conn, [{packet, raw}]),
         recv(Conn, Len + 2, Timeout);
     Other ->
         {error, Other}
