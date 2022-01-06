@@ -23,29 +23,55 @@ Exports
 
 ### httpb:close(Connection) -> ok | {error, Reason}
 
+Close the `Connection`.
+
 - - -
-### httpd:controlling_process(Connection, Pid) -> ok | {error, Reason}
+### httpb:controlling_process(Connection, Pid) -> ok | {error, Reason}
+
+See `gen_tcp:controlling_process/2` or `ssl:controlling_process/2`.
 
 - - -
 ### httpb:getopts(Connection, Options) -> {ok, Options} | {error, Reason}
 
+See `inet:getopts/2` or `ssl:getopts/2`.
+
 - - -
 ### httpb:is_chunked(Headers) -> true | false
 
+Return true if `Transfer-Encoding` is present and equal to `chunked`.
+
 - - -
 ### httpb:is_keep_alive(Headers) -> true | false
+
+Return false if `Connection` header is present and equal to `close`; otherwise true.
 
 - - -
 ### httpb:recv(Connection, Length) -> {ok, Data} | {error, Reason}
 ### httpb:recv(Connection, Length, Timeout) -> {ok, Data} | {error, Reason}
 
+Receives a packet from a `Connection` in passive mode (`{active, false}`).  A closed `Connection` is indicated by return value `{error, closed}`.
+
+Argument `Length` is meaningful only when the `Connection` is in mode raw and denotes the number of bytes to read.  If `Length = 0`, all available bytes are returned.  If `Length > 0`, exactly `Length` bytes are returned, or an error; possibly discarding less than `Length` bytes of data when the `Connection` gets closed from the other side.
+
+Optional argument `Timeout` specifies a time-out in milliseconds; default value is 30000.
+
 - - -
 ### httpb:recv_chunk(Connection) -> {ok, Data} | {error, Reason}
 ### httpb:recv_chunk(Connection, Timeout) -> {ok, Data} | {error, Reason}
 
+Read the next chunk from the `Connection`.  A zero length `Data` chunk typically indicated end of the response body.
+
+Optional argument `Timeout` specifies a time-out in milliseconds; default value is 30000.
+
 - - -
 ### httpb:request(Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
+
+Start an initial HTTP/1.1 request, returning the `Connection` on success.
+
+- - -
 ### httpb:request(Connection, Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
+
+Given an already open connection, send a request.
 
 - - -
 ### httpb:response(Connection) -> {ok, Result} | {error, Reason}
@@ -53,14 +79,22 @@ Exports
 
 Read the HTTP response line and headers.  If the response is chunked, then no `body` is returned, see `httpb:recv_chunk/1,2`; otherwise read as much of the body as possible.
 
+Optional argument `Timeout` specifies a time-out in milliseconds; default value is 30000.
+
 - - -
 ### httpb:send(Connection, Data) -> ok | {error, Reason}
+
+Send `Data` to the `Connection`.
 
 - - -
 ### httpb:send_chunk(Connection, Data) -> ok | {error, Reason}
 
+Send `Data` as an HTTP formatted chunk to the `Connection`.
+
 - - -
 ### httpb:setopts(Connection, Options) -> ok | {error, Reason}
+
+See `inet:setopts/2` or `ssl:setopts/2`.
 
 
 Examples
