@@ -1,0 +1,15 @@
+{application, httpb,
+ [{description, "An HTTP basic client"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications,
+   [kernel,
+    stdlib,
+    ssl
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {licenses, ["MIT"]},
+  {links, []}
+ ]}.
