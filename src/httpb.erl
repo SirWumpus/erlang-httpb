@@ -131,7 +131,7 @@ send(#{scheme := https, socket := Socket}, Data) ->
 
 -spec recv(Conn :: connection(), Length :: non_neg_integer()) -> ret_data().
 recv(Conn, Length) ->
-    recv(Conn, Length, infinity).
+    recv(Conn, Length, ?DEFAULT_TIMEOUT).
 
 -spec recv(Conn :: connection(), Length :: non_neg_integer(), Timeout :: timeout()) -> ret_data().
 recv(#{scheme := http, socket := Socket}, Length, Timeout) ->
