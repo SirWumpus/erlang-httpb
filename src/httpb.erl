@@ -9,7 +9,7 @@
 -module(httpb).
 -export([
     request/4, request/5, response/1, response/2,
-    is_chunked/1, is_keep_alive/1, send_chunk/2, recv_chunk/1, recv_chunk/2,
+    is_chunked/1, is_keep_alive/1, content_length/1, send_chunk/2, recv_chunk/1, recv_chunk/2,
     close/1, recv/2, recv/3, send/2, getopts/2, setopts/2, controlling_process/2
 ]).
 
@@ -60,7 +60,7 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
         case send(Conn, Body) of
         ok ->
             ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
-            {ok, Conn};
+            {ok, Conn#{method => Method}};
         Other ->
             Other
         end;
@@ -186,13 +186,33 @@ is_chunked(#{transfer_encoding := <<"chunked">>}) ->
 is_chunked(_Hdrs) ->
     false.
 
+-spec content_length(Result_Or_Headers :: result() | headers()) -> integer().
+content_length(#{headers := Headers}) ->
+    content_length(Headers);
+content_length(#{content_length := Length}) ->
+    binary_to_integer(Length, 10);
+content_length(_Hdrs) ->
+    0.
+
+-spec has_body(Conn :: connection(), Res :: result()) -> boolean().
+has_body(#{method := head}, _Res) ->
+    false;
+has_body(_Conn, #{status := 204}) ->
+    false;
+has_body(_Conn, #{status := 304}) ->
+    false;
+has_body(_Conn, #{status := Status}) when 100 =< Status andalso Status =< 199 ->
+    false;
+has_body(_Conn, Res) ->
+    is_chunked(Res) == false andalso content_length(Res) > 0.
+
 -spec response(Conn :: connection()) -> ret_result().
 response(Conn) ->
     response(Conn, ?DEFAULT_TIMEOUT).
 
 -spec response(Conn :: connection(), Timeout :: timeout()) -> ret_result().
 response(Conn, Timeout) ->
-    response(Conn, Timeout, #{status => 0, headers => #{}}).
+    response(Conn, Timeout, #{status => 0, headers => #{}, body => <<>>}).
 
 -spec response(Conn :: connection(), Timeout :: timeout(), Res :: result()) -> ret_result().
 response(Conn, Timeout, Res) ->
@@ -212,12 +232,13 @@ response(Conn, Timeout, Res) ->
         ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{body => <<Body/binary, Data/binary>>});
     {_Type, _Socket, http_eoh} ->
-        case is_chunked(Res) of
-        false ->
+        #{status := Status} = Res,
+        case has_body(Conn, Res) of
+        true ->
             % Read as much of the body as possible.
             ok = setopts(Conn, [{active, once}, {packet, raw}]),
             response(Conn, Timeout, Res);
-        true ->
+        false ->
             % Stop reading before first chunk.
             {ok, Res}
         end;
