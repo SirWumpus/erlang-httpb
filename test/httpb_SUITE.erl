@@ -10,14 +10,12 @@
 
 all() ->
     [
-        {group, group_basic},
-        {group, group_no_body}
+        {group, group_basic}
     ].
 
 groups() ->
     [
-        {group_basic,   [], basic()},
-        {group_no_body, [], [req_res_no_body]}
+        {group_basic,   [], basic()}
     ].
 
 basic() ->
@@ -53,12 +51,7 @@ init_per_group(Group, [{server, _Pid} | Config]) ->
 
 init_per_group(Group = group_basic, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
-    {ok, Server} = httpd_dummy:start({httpd_dummy, reply_hello, []}),
-    [{server, Server} | Config];
-
-init_per_group(Group = group_no_body, Config) ->
-    ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
-    {ok, Server} = httpd_dummy:start(404),
+    {ok, Server} = httpd_dummy:start(),
     [{server, Server} | Config].
 
 end_per_group(Group, Config) ->
@@ -86,7 +79,7 @@ req_close(_Config) ->
 req_res(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008", #{}, <<>>),
-    {ok, #{status := 204}} = httpb:response(Conn, ?TIMEOUT),
+    {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, [{active, _}]} = httpb:getopts(Conn, [active]),
     ok = httpb:close(Conn).
 
@@ -139,12 +132,6 @@ req_res_req_res(_Config) ->
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, Conn} = httpb:request(Conn, get, "http://localhost:8008/bogus", #{}, <<>>),
     {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
-    ok = httpb:close(Conn).
-
-req_res_no_body(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/", #{}, <<>>),
-    {ok, #{status := 404, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
 req_put_res(Config) ->

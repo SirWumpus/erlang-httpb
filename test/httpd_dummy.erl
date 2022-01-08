@@ -8,14 +8,11 @@
 
 -spec start() -> any().
 start() ->
-    start(204).
+    start({?MODULE, reply_hello, []}).
 
 -spec start(Args :: list()) -> {ok, pid()} | {error, any()}.
 start({_Mod, _Fun, _Args} = MFA) ->
     start([{127,0,0,1}, 8008, ".", ".", MFA]);
-
-start(Status) when is_integer(Status) ->
-    start({?MODULE, reply_status, Status});
 
 start(Args) ->
     gen_server:start({local, ?MODULE}, ?MODULE, Args, []).
@@ -75,28 +72,11 @@ do(Req = #mod{method = Method, request_uri = Uri, config_db = Config}) ->
     [{dispatch_mfa, {Module, Function, Args}}] = ets:lookup(Config, dispatch_mfa),
     Module:Function(Req, Args).
 
--spec reply_status(Req :: #mod{}, Status :: integer()) -> tuple().
-reply_status(#mod{method = Method, request_uri = Uri}, Status) ->
-    io:format("~s~p RES ~s ~s ~B~n", [?MODULE, self(), Method, Uri, Status]),
-    {proceed, [{response, {Status, []}}]}.
-
--spec reply_content(Req :: #mod{}, {Status :: integer(), Headers :: list(), Body :: list()}) -> tuple().
-reply_content(#mod{method = Method, request_uri = Uri}, {Status, Headers, Body}) ->
-    io:format("~s~p RES ~s ~s ~B~n", [?MODULE, self(), Method, Uri, Status]),
-    {proceed, [{response, {response, [{code, Status}] ++ Headers, Body}}]}.
-
--spec reply_echo(Req :: #mod{}, Args :: any()) -> tuple().
-reply_echo(#mod{method = Method, request_uri = Uri, parsed_header = Headers, entity_body = Body}, _Args) ->
-    ContentType = proplists:get_value(content_type, Headers),
-    io:format("~s~p RES ~s ~s ~B~n", [?MODULE, self(), Method, Uri, 200]),
-    {proceed, [{response, {response, [{code, 200}, {content_type, ContentType}], Body}}]}.
-
 -spec reply_hello(Req :: #mod{}, Args :: any()) -> tuple().
 reply_hello(Req = #mod{method = Method, request_uri = Uri}, _Args) ->
     {Path, _} = httpd_util:split_path(Uri),
     {Status, Headers, Body} = hello_dispatch(Req, Method, Path),
     io:format("~s~p RES ~s ~s ~B~n", [?MODULE, self(), Method, Uri, Status]),
-io:format("woot ~p~n", [Body]),
     {proceed, [{response, {response, [{code, Status}] ++ Headers, Body}}]}.
 
 -define(HELLO, "Hello world.\r\n").
@@ -130,11 +110,11 @@ hello_dispatch(_Req, "GET", "/chunky") ->
         "6\r\nCiao.\n\r\n",
         "0\r\n\r\n"
     ]};
-hello_dispatch(#mod{parsed_header = Headers, entity_body = Body}, "POST", "/echo") ->
+hello_dispatch(#mod{parsed_header = Headers, entity_body = Body}, _Method, "/echo") ->
     ContentType = proplists:get_value("content-type", Headers),
     {200, [
         {content_type, ContentType},
         {content_length, integer_to_list(length(Body))}
     ], Body};
 hello_dispatch(_Req, _Method, _Path) ->
-    {404, [], ["Not found.\r\n"]}.
+    {404, [], []}.
