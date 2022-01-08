@@ -26,6 +26,11 @@ Exports
 Close the `Connection`.
 
 - - -
+### httpb:content_length(Headers) -> Length.
+
+Return the content length.
+
+- - -
 ### httpb:controlling_process(Connection, Pid) -> ok | {error, Reason}
 
 See `gen_tcp:controlling_process/2` or `ssl:controlling_process/2`.
