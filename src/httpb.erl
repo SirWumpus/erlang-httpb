@@ -173,8 +173,6 @@ is_keep_alive(#{headers := Headers}) ->
     is_keep_alive(Headers);
 is_keep_alive(#{connection := <<"close">>}) ->
     false;
-is_keep_alive(#{connection := _Other}) ->
-    true;
 is_keep_alive(_Hdrs) ->
     true.
 
@@ -183,8 +181,6 @@ is_chunked(#{headers := Headers}) ->
     is_chunked(Headers);
 is_chunked(#{transfer_encoding := <<"chunked">>}) ->
     true;
-is_chunked(#{transfer_encoding := _Other}) ->
-    false;
 is_chunked(_Hdrs) ->
     false.
 
