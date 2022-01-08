@@ -242,7 +242,7 @@ response(Conn, Timeout, Res) ->
     Other ->
         {error, Other}
     after Timeout ->
-        {error, {timeout, Timeout}}
+        {error, {timeout, Res}}
     end.
 
 -spec recv_chunk(Conn :: connection()) -> ret_data().
