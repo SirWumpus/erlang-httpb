@@ -83,8 +83,6 @@ method(delete) ->
     <<"DELETE">>.
 
 -spec path(Path :: binary(), Query :: binary() | undefined) -> binary().
-path(Path, undefined) ->
-    Path;
 path(Path, <<>>) ->
     Path;
 path(Path, Query) ->
@@ -232,7 +230,6 @@ response(Conn, Timeout, Res) ->
         ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{body => <<Body/binary, Data/binary>>});
     {_Type, _Socket, http_eoh} ->
-        #{status := Status} = Res,
         case has_body(Conn, Res) of
         true ->
             % Read as much of the body as possible.
