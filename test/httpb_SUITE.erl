@@ -6,6 +6,7 @@
 -compile(export_all).
 
 -define(TIMEOUT, 1000).
+-define(HELLO, "Hello world.\r\n").
 
 all() ->
     [
@@ -25,14 +26,18 @@ basic() ->
         is_keep_alive,
         req_close,
         req_res,
-        req_res_empty,
         req_res_not_found,
         req_res_body,
         req_head_res,
         req_query_res,
         req_options_res,
         req_res_chunks,
-        req_res_req_res
+        req_res_req_res,
+        req_put_res,
+        req_delete_res,
+        req_post_echo,
+        req_post_send_echo,
+        req_post_chunk_echo
     ].
 
 init_per_suite(Config)->
@@ -85,12 +90,6 @@ req_res(_Config) ->
     {ok, [{active, _}]} = httpb:getopts(Conn, [active]),
     ok = httpb:close(Conn).
 
-req_res_empty(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/empty", #{}, <<>>),
-    {ok, #{status := 204}} = httpb:response(Conn, ?TIMEOUT),
-    ok = httpb:close(Conn).
-
 req_res_not_found(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008/bogus", #{}, <<>>),
@@ -100,7 +99,7 @@ req_res_not_found(_Config) ->
 req_res_body(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008/hello", #{}, <<>>),
-    {ok, #{status := 200, body := <<"Hello world.\r\n">>}} = httpb:response(Conn, ?TIMEOUT),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn),
     ok = httpb:close(Conn).
 
 req_head_res(_Config) ->
@@ -137,7 +136,7 @@ req_res_chunks(_Config) ->
 req_res_req_res(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008/hello", #{}, <<>>),
-    {ok, #{status := 200, body := <<"Hello world.\r\n">>}} = httpb:response(Conn, ?TIMEOUT),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, Conn} = httpb:request(Conn, get, "http://localhost:8008/bogus", #{}, <<>>),
     {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
@@ -146,4 +145,47 @@ req_res_no_body(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008/", #{}, <<>>),
     {ok, #{status := 404, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_put_res(Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    req_method_res(Config, put).
+
+req_delete_res(Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    req_method_res(Config, delete).
+
+req_method_res(_Config, Method) ->
+    {ok, Conn} = httpb:request(Method, "http://localhost:8008/", #{}, <<?HELLO>>),
+    {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_post_echo(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+        content_length => integer_to_binary(length(?HELLO)),
+        content_type => <<"text/plain">>
+    }, <<?HELLO>>),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_post_send_echo(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+        content_length => integer_to_binary(length(?HELLO)),
+        content_type => <<"text/plain">>
+    }, <<>>),
+    ok = httpb:send(Conn, <<?HELLO>>),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_post_chunk_echo(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+        transfer_encoding => <<"chunked">>,
+        content_type => <<"text/plain">>
+    }, <<>>),
+    ok = httpb:send_chunk(Conn, <<?HELLO>>),
+    ok = httpb:send_chunk(Conn, <<>>),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
