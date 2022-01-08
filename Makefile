@@ -20,7 +20,7 @@ build:
 	rebar3 compile
 
 clean:
-	-rm -rf src/*$B ./*$B *dump *.core
+	-rm -rf src/*$B test/*$B ./*$B *dump *.core
 
 distclean: clean
 	-rm -rf _build _checkouts ebin
@@ -28,14 +28,21 @@ distclean: clean
 tar:
 	git archive --format tar.gz --prefix ${PROJ}/ -o ${PROJ}.tar.gz HEAD
 
-test: dialyzer unit
+test: dialyzer unit ct
+	rebar3 cover
 
 dialyzer:
-	rebar3 dialyzer
+	-rebar3 dialyzer
 
 unit:
-	rebar3 eunit --cover
-	rebar3 cover
+	-rebar3 eunit --cover
+
+ct:
+	-rebar3 ct --cover
+
+logs: ct
+	lynx _build/test/logs/index.html
 
 cover: unit
 	lynx _build/test/cover/index.html
+
