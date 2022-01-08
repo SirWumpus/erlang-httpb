@@ -49,6 +49,8 @@ request(Method, Url, Hdrs, Body) ->
     end.
 
 -spec request(Conn :: connection(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
+request(Conn, Method, Url, Hdrs, Body) when is_list(Url) ->
+    request(Conn, Method, list_to_binary(Url), Hdrs, Body);
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
     {ok, {_Scheme, _UserInfo, _Host, _Port, Path, Query}} = http_uri:parse(Url),
     Req0 = <<(method(Method))/binary, " ", (path(Path, Query))/binary, " HTTP/1.1\r\n">>,
