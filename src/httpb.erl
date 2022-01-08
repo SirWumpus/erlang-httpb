@@ -263,7 +263,13 @@ recv_chunk(Conn, Timeout) ->
         Hex = string:trim(Line),
         Len = binary_to_integer(Hex, 16),
         ok = setopts(Conn, [{packet, raw}]),
-        recv(Conn, Len + 2, Timeout);
+        case recv(Conn, Len + 2, Timeout) of
+        {ok, Data} ->
+            <<Data1:Len/binary, "\r\n">> = Data,
+            {ok, Data1};
+        Other ->
+            Other
+        end;
     Other ->
         {error, Other}
     after Timeout ->
