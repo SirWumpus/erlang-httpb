@@ -28,21 +28,18 @@ distclean: clean
 tar:
 	git archive --format tar.gz --prefix ${PROJ}/ -o ${PROJ}.tar.gz HEAD
 
-test: dialyzer unit ct
+test: dialyzer ct
 	rebar3 cover
 
 dialyzer:
 	-rebar3 dialyzer
 
-unit:
-	-rebar3 eunit --cover
-
 ct:
 	-rebar3 ct --cover
 
-logs: ct
+logs: test
 	lynx _build/test/logs/index.html
 
-cover: unit
+cover: test
 	lynx _build/test/cover/index.html
 
