@@ -258,7 +258,7 @@ response(#{socket := Socket} = Conn, Timeout, Res) ->
     Other ->
         {error, Other}
     after Timeout ->
-        {error, {timeout, Res}}
+        {error, timeout}
     end.
 
 -spec recv_chunk(Conn :: connection()) -> ret_data().
@@ -289,7 +289,7 @@ recv_chunk(Conn, Timeout) ->
     Other ->
         {error, Other}
     after Timeout ->
-        {error, {timeout, Timeout}}
+        {error, timeout}
     end.
 
 -spec send_chunk(Conn :: connection(), Data :: binary()) -> ret_ok().
