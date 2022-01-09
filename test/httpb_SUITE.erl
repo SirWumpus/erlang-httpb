@@ -23,8 +23,10 @@ basic() ->
         already_closed,
         is_keep_alive,
         has_body,
+        connect_fail,
         req_close,
         req_res,
+        req_res_timeout,
         req_res_not_found,
         req_res_body,
         req_head_res,
@@ -36,7 +38,8 @@ basic() ->
         req_delete_res,
         req_post_echo,
         req_post_send_echo,
-        req_post_chunk_echo
+        req_post_chunk_echo,
+        req_post_chunk_fail
     ].
 
 init_per_suite(Config)->
@@ -83,6 +86,10 @@ has_body(_Config) ->
     false = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"chunked">>}),
     true  = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"identity">>}).
 
+connect_fail(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {error, _Reason} = httpb:request(get, "http://localhost", #{}, <<>>).
+
 req_close(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008", #{}, <<>>),
@@ -92,7 +99,15 @@ req_res(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     {ok, Conn} = httpb:request(get, "http://localhost:8008", #{}, <<>>),
     {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
-    {ok, [{active, _}]} = httpb:getopts(Conn, [active]),
+    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
+    ok = httpb:close(Conn).
+
+req_res_timeout(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {ok, Conn} = httpb:request(get, "http://localhost:8008/bogus", #{}, <<>>),
+    {ok, [{active, once}]} = httpb:getopts(Conn, [active]),
+    ok = httpb:setopts(Conn, [{active, false}]),
+    {error, timeout} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
 req_res_not_found(_Config) ->
@@ -188,3 +203,12 @@ req_post_chunk_echo(_Config) ->
     ok = httpb:send_chunk(Conn, <<>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
+
+req_post_chunk_fail(_Config) ->
+    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+        transfer_encoding => <<"chunked">>,
+        content_type => <<"text/plain">>
+    }, <<>>),
+    ok = httpb:close(Conn),
+    {error, closed} = httpb:send_chunk(Conn, <<?HELLO>>).
