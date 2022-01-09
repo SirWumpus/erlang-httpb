@@ -15,7 +15,7 @@ all() ->
 
 groups() ->
     [
-        {group_basic,   [], basic()}
+        {group_basic, [shuffle], basic()}
     ].
 
 basic() ->
@@ -148,9 +148,9 @@ req_res_chunks(_Config) ->
     {ok, Conn} = httpb:request(get, "http://localhost:8008/chunky", #{}, <<>>),
     {ok, #{status := 200, headers := Headers}} = httpb:response(Conn, ?TIMEOUT),
     true = httpb:is_chunked(Headers),
-    {ok, <<"Hello world.\n">>} = httpb:recv_chunk(Conn, ?TIMEOUT),
-    {ok, <<"Ciao.\n">>} = httpb:recv_chunk(Conn, ?TIMEOUT),
-    {ok, <<>>} = httpb:recv_chunk(Conn, ?TIMEOUT),
+    {ok, <<"Hello world.\n">>} = httpb:recv_chunk(Conn),
+    {ok, <<"Ciao.\n">>} = httpb:recv_chunk(Conn),
+    {ok, <<>>} = httpb:recv_chunk(Conn),
     ok = httpb:close(Conn).
 
 req_res_req_res(_Config) ->
