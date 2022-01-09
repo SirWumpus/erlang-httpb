@@ -22,6 +22,7 @@ basic() ->
     [
         already_closed,
         is_keep_alive,
+        has_body,
         req_close,
         req_res,
         req_res_not_found,
@@ -70,6 +71,17 @@ is_keep_alive(_Config) ->
     true = httpb:is_keep_alive(#{connection => <<"other">>}),
     false = httpb:is_keep_alive(#{connection => <<"close">>}),
     false = httpb:is_keep_alive(#{headers => #{connection => <<"close">>}}).
+
+has_body(_Config) ->
+    false = httpb:has_body(#{method => head}, #{}),
+    false = httpb:has_body(#{}, #{}),
+    false = httpb:has_body(#{}, #{status => 204}),
+    false = httpb:has_body(#{}, #{status => 304}),
+    false = httpb:has_body(#{}, #{status => 199}),
+    false = httpb:has_body(#{}, #{transfer_encoding => <<"chunked">>}),
+    true  = httpb:has_body(#{}, #{content_length => <<"123">>}),
+    false = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"chunked">>}),
+    true  = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"identity">>}).
 
 req_close(_Config) ->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
