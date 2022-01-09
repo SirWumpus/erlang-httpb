@@ -213,23 +213,35 @@ response(Conn, Timeout) ->
     response(Conn, Timeout, #{status => 0, headers => #{}, body => <<>>}).
 
 -spec response(Conn :: connection(), Timeout :: timeout(), Res :: result()) -> ret_result().
-response(Conn, Timeout, Res) ->
+response(#{socket := Socket} = Conn, Timeout, Res) ->
     receive
-    {_Type, _Socket, {http_response, _, Status, _}} ->
+    {ssl_error, Socket, Reason} ->
+        close(Conn),
+        {error, Reason};
+    {ssl_closed, Socket} ->
+        % The server write end can close before we've read all the data.
+        response(Conn, Timeout, Res);
+    {tcp_error, Socket, Reason} ->
+        close(Conn),
+        {error, Reason};
+    {tcp_closed, Socket} ->
+        % The server write end can close before we've read all the data.
+        response(Conn, Timeout, Res);
+    {_Type, Socket, {http_response, _, Status, _}} ->
         % _Type :: http | ssl
         ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{status => Status});
-    {_Type, _Socket, {http_header, _, Key, _, Value}} ->
+    {_Type, Socket, {http_header, _, Key, _, Value}} ->
         Key1 = field_to_atom(Key),
         Hdrs = maps:get(headers, Res),
         ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{headers => Hdrs#{Key1 => Value}});
-    {_Type, _Socket, {http_error, Data}}  ->
+    {_Type, Socket, {http_error, Data}}  ->
         % Switching to raw packets can still result in some data.
         Body = maps:get(body, Res, <<>>),
         ok = setopts(Conn, [{active, once}]),
         response(Conn, Timeout, Res#{body => <<Body/binary, Data/binary>>});
-    {_Type, _Socket, http_eoh} ->
+    {_Type, Socket, http_eoh} ->
         case has_body(Conn, Res) of
         true ->
             % Read as much of the body as possible.
@@ -239,24 +251,10 @@ response(Conn, Timeout, Res) ->
             % Stop reading before first chunk.
             {ok, Res}
         end;
-    {ssl, _Socket, Data} ->
+    {_Type, Socket, Data} ->
+        % _Type :: tcp | ssl
         Body = maps:get(body, Res, <<>>),
         {ok, Res#{body => <<Body/binary, Data/binary>>}};
-    {ssl_error, _Socket, Reason} ->
-        close(Conn),
-        {error, Reason};
-    {ssl_closed, _Socket} ->
-        % The server write end can close before we've read all the data.
-        response(Conn, Timeout, Res);
-    {tcp, _Socket, Data} ->
-        Body = maps:get(body, Res, <<>>),
-        {ok, Res#{body => <<Body/binary, Data/binary>>}};
-    {tcp_error, _Socket, Reason} ->
-        close(Conn),
-        {error, Reason};
-    {tcp_closed, _Socket} ->
-        % The server write end can close before we've read all the data.
-        response(Conn, Timeout, Res);
     Other ->
         {error, Other}
     after Timeout ->
