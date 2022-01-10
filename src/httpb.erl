@@ -28,6 +28,7 @@
 -type method()          :: get | head | options | post | put | delete.
 -type result()          :: #{status => integer(), headers => headers(), body => body()}.
 -type socket()          :: gen_tcp:socket() | ssl:sslsocket().
+-type options()         :: #{socket_opts => list(), timeout => timeout()}.
 -type connection()      :: #{scheme => scheme(), host => string() | binary(), port => non_neg_integer(), socket => socket()}.
 
 -type ret_ok()          :: ok | error().
@@ -36,19 +37,23 @@
 -type ret_result()      :: {ok, result()} | error().
 
 -spec request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
-request(Method, Url, Hdrs, Body) when is_list(Url) ->
-    request(Method, list_to_binary(Url), Hdrs, Body);
 request(Method, Url, Hdrs, Body) ->
+    request(#{socket_opts => []}, Method, Url, Hdrs, Body).
+
+-spec request(Conn :: connection() | options(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
+request(#{socket_opts := _} = Options, Method, Url, Hdrs, Body) when is_list(Url) ->
+    request(Options, Method, list_to_binary(Url), Hdrs, Body);
+request(#{socket_opts := SocketOpts} = Options, Method, Url, Hdrs, Body) ->
+    Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
     {ok, {Scheme, _UserInfo, Host, Port, _Path, _Query}} = http_uri:parse(Url),
-    case connect(Scheme, Host, Port) of
+    case connect(Scheme, Host, Port, SocketOpts, Timeout) of
     {ok, Socket} ->
         Conn = #{scheme => Scheme, host => Host, port => Port, socket => Socket},
         request(Conn, Method, Url, Hdrs, Body);
     Other ->
         Other
-    end.
+    end;
 
--spec request(Conn :: connection(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
 request(Conn, Method, Url, Hdrs, Body) when is_list(Url) ->
     request(Conn, Method, list_to_binary(Url), Hdrs, Body);
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
@@ -88,18 +93,14 @@ path(Path, <<>>) ->
 path(Path, Query) ->
     <<Path/binary, $?, Query/binary>>.
 
--spec connect(Scheme :: scheme(), Host :: binary(), Port :: non_neg_integer()) -> {ok, socket()} | error().
-connect(Scheme, Host, Port) ->
-    connect(Scheme, Host, Port, [binary], ?DEFAULT_TIMEOUT).
-
 -spec connect(Scheme :: scheme(), Host :: string() | binary(), Port :: non_neg_integer(), Options :: list(), Timeout :: timeout()) -> {ok, socket()} | error().
 connect(Scheme, Host, Port, Options, Timeout) when is_binary(Host) ->
     connect(Scheme, binary_to_list(Host), Port, Options, Timeout);
 connect(http, Host, Port, Options, Timeout) ->
-    gen_tcp:connect(Host, Port, Options, Timeout);
+    gen_tcp:connect(Host, Port, [binary | Options], Timeout);
 connect(https, Host, Port, Options, Timeout) ->
     ssl:start(),
-    ssl:connect(Host, Port, Options, Timeout).
+    ssl:connect(Host, Port, [binary | Options], Timeout).
 
 -spec close(Conn :: connection()) -> ret_ok().
 close(#{scheme := http, socket := Socket}) ->
@@ -266,16 +267,23 @@ recv_chunk(Conn) ->
     recv_chunk(Conn, ?DEFAULT_TIMEOUT).
 
 -spec recv_chunk(Conn :: connection(), Timeout :: timeout()) -> ret_data().
-recv_chunk(Conn, Timeout) ->
+recv_chunk(#{socket := Socket} = Conn, Timeout) ->
     ok = setopts(Conn, [{active, once}, {packet, line}]),
     receive
-    {tcp_error, _Socket, Reason} ->
+    {ssl_error, Socket, Reason} ->
         close(Conn),
         {error, Reason};
-    {tcp_closed, _Socket} ->
+    {ssl_closed, Socket} ->
         close(Conn),
         {ok, <<>>};
-    {tcp, _Socket, Line} ->
+    {tcp_error, Socket, Reason} ->
+        close(Conn),
+        {error, Reason};
+    {tcp_closed, Socket} ->
+        close(Conn),
+        {ok, <<>>};
+    {_Type, Socket, Line} ->
+        % _Type :: tcp | ssl
         Hex = string:trim(Line),
         Len = binary_to_integer(Hex, 16),
         ok = setopts(Conn, [{packet, raw}]),

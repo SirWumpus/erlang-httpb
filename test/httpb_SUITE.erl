@@ -10,12 +10,14 @@
 
 all() ->
     [
-        {group, group_basic}
+        {group, group_basic},
+        {group, group_ssl}
     ].
 
 groups() ->
     [
-        {group_basic, [shuffle], basic()}
+        {group_basic, [shuffle], basic()},
+        {group_ssl, [shuffle], ssl()}
     ].
 
 basic() ->
@@ -23,6 +25,28 @@ basic() ->
         already_closed,
         is_keep_alive,
         has_body,
+        connect_fail,
+        req_close,
+        req_res,
+        req_res_timeout,
+        req_res_not_found,
+        req_res_body,
+        req_head_res,
+        req_query_res,
+        req_options_res,
+        req_res_chunks,
+        req_res_req_res,
+        req_put_res,
+        req_delete_res,
+        req_post_echo,
+        req_post_send_echo,
+        req_post_chunk_echo,
+        req_post_chunk_fail
+    ].
+
+ssl() ->
+    [
+        ssl_already_closed,
         connect_fail,
         req_close,
         req_res,
@@ -50,32 +74,63 @@ end_per_suite(_Config)->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     ok.
 
-init_per_group(Group, [{server, _Pid} | Config]) ->
-    init_per_group(Group, Config);
-
 init_per_group(Group = group_basic, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     {ok, Server} = httpd_dummy:start(),
-    [{server, Server} | Config].
+    [{server, Server}, {scheme, "http"}] ++ Config;
+
+% Make a self-sign certificate:
+%
+%   openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+%       -keyout priv/localhost.key -out priv/localhost.crt -subj "/CN=localhost" \
+%       -addext "subjectAltName=DNS:localhost" \
+%       -config /usr/share/examples/openssl/openssl.cnf
+%
+init_per_group(Group = group_ssl, Config) ->
+    ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
+    {ok, Server} = httpd_dummy:start([
+        {bind_address, {127,0,0,1}},
+        {port, 8008},
+        {server_root, "."},
+        {document_root, "."},
+        {dispatch_mfa, {httpd_dummy, reply_hello, []}},
+        {socket_type, {essl, [
+            {keyfile, filename:join([code:priv_dir(httpb), "localhost.key"])},
+            {certfile, filename:join([code:priv_dir(httpb), "localhost.crt"])}
+        ]}}
+    ]),
+    [{server, Server}, {scheme, "https"}] ++ Config.
 
 end_per_group(Group, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     Server = proplists:get_value(server, Config),
     ok = httpd_dummy:stop(Server).
 
-already_closed(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+already_closed(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Socket} = gen_tcp:connect("localhost", 8008, []),
     ok = gen_tcp:close(Socket),
     ok = httpb:close(#{scheme => http, socket => Socket}).
 
-is_keep_alive(_Config) ->
+ssl_already_closed(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Socket} = ssl:connect("localhost", 8008, []),
+    ok = ssl:close(Socket),
+    ok = httpb:close(#{scheme => https, socket => Socket}).
+
+is_keep_alive(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     true = httpb:is_keep_alive(#{}),
     true = httpb:is_keep_alive(#{connection => <<"other">>}),
     false = httpb:is_keep_alive(#{connection => <<"close">>}),
     false = httpb:is_keep_alive(#{headers => #{connection => <<"close">>}}).
 
-has_body(_Config) ->
+has_body(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     false = httpb:has_body(#{method => head}, #{}),
     false = httpb:has_body(#{}, #{}),
     false = httpb:has_body(#{}, #{status => 204}),
@@ -86,66 +141,76 @@ has_body(_Config) ->
     false = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"chunked">>}),
     true  = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"identity">>}).
 
-connect_fail(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {error, _Reason} = httpb:request(get, "http://localhost", #{}, <<>>).
+connect_fail(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {error, _Reason} = httpb:request(get, Scheme++"://localhost", #{}, <<>>).
 
-req_close(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008", #{}, <<>>),
+req_close(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008", #{}, <<>>),
     ok = httpb:close(Conn).
 
-req_res(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008", #{}, <<>>),
+req_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008", #{}, <<>>),
     {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
     ok = httpb:close(Conn).
 
-req_res_timeout(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/bogus", #{}, <<>>),
+req_res_timeout(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
     {ok, [{active, once}]} = httpb:getopts(Conn, [active]),
     ok = httpb:setopts(Conn, [{active, false}]),
     {error, timeout} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_res_not_found(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/bogus", #{}, <<>>),
+req_res_not_found(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
     {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_res_body(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/hello", #{}, <<>>),
+req_res_body(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello", #{}, <<>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn),
     ok = httpb:close(Conn).
 
-req_head_res(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(head, "http://localhost:8008/hello", #{}, <<>>),
+req_head_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(head, Scheme++"://localhost:8008/hello", #{}, <<>>),
     {ok, #{status := 200, headers := Hdrs, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     14 = httpb:content_length(Hdrs),
     ok = httpb:close(Conn).
 
-req_query_res(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(head, "http://localhost:8008/hello?foo=bar", #{}, <<>>),
+req_query_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(head, Scheme++"://localhost:8008/hello?foo=bar", #{}, <<>>),
     {ok, #{status := 200, headers := Hdrs, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     14 = httpb:content_length(Hdrs),
     ok = httpb:close(Conn).
 
-req_options_res(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(options, "http://localhost:8008/hello", #{}, <<>>),
+req_options_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/hello", #{}, <<>>),
     % httpd does not support OPTIONS yet.
     {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_res_chunks(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/chunky", #{}, <<>>),
+req_res_chunks(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/chunky", #{}, <<>>),
     {ok, #{status := 200, headers := Headers}} = httpb:response(Conn, ?TIMEOUT),
     true = httpb:is_chunked(Headers),
     {ok, <<"Hello world.\n">>} = httpb:recv_chunk(Conn),
@@ -153,39 +218,45 @@ req_res_chunks(_Config) ->
     {ok, <<>>} = httpb:recv_chunk(Conn),
     ok = httpb:close(Conn).
 
-req_res_req_res(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(get, "http://localhost:8008/hello", #{}, <<>>),
+req_res_req_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello", #{}, <<>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
-    {ok, Conn} = httpb:request(Conn, get, "http://localhost:8008/bogus", #{}, <<>>),
+    {ok, Conn} = httpb:request(Conn, get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
     {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
 req_put_res(Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     req_method_res(Config, put).
 
 req_delete_res(Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     req_method_res(Config, delete).
 
-req_method_res(_Config, Method) ->
-    {ok, Conn} = httpb:request(Method, "http://localhost:8008/", #{}, <<?HELLO>>),
+req_method_res(Config, Method) ->
+    Scheme = proplists:get_value(scheme, Config),
+    {ok, Conn} = httpb:request(Method, Scheme++"://localhost:8008/", #{}, <<?HELLO>>),
     {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_post_echo(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+req_post_echo(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(post, Scheme++"://localhost:8008/echo", #{
         content_length => integer_to_binary(length(?HELLO)),
         content_type => <<"text/plain">>
     }, <<?HELLO>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_post_send_echo(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+req_post_send_echo(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(post, Scheme++"://localhost:8008/echo", #{
         content_length => integer_to_binary(length(?HELLO)),
         content_type => <<"text/plain">>
     }, <<>>),
@@ -193,9 +264,10 @@ req_post_send_echo(_Config) ->
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_post_chunk_echo(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+req_post_chunk_echo(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(post, Scheme++"://localhost:8008/echo", #{
         transfer_encoding => <<"chunked">>,
         content_type => <<"text/plain">>
     }, <<>>),
@@ -204,9 +276,10 @@ req_post_chunk_echo(_Config) ->
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_post_chunk_fail(_Config) ->
-    ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
-    {ok, Conn} = httpb:request(post, "http://localhost:8008/echo", #{
+req_post_chunk_fail(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(post, Scheme++"://localhost:8008/echo", #{
         transfer_encoding => <<"chunked">>,
         content_type => <<"text/plain">>
     }, <<>>),

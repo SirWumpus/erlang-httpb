@@ -15,6 +15,7 @@ Data Types
 * Method            :: get | head | options | post | put | delete.
 * Result            :: #{status => integer(), headers => headers(), body => body()}.
 * Socket            :: gen_tcp:socket() | ssl:sslsocket().
+* Options           :: #{socket_opts => list(), timeout => timeout()}.
 * Connection        :: #{scheme => http | https, host => string(), port => non_neg_integer(), socket => socket()}.
 
 
@@ -70,6 +71,7 @@ Optional argument `Timeout` specifies a time-out in milliseconds; default value 
 
 - - -
 ### httpb:request(Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
+### httpb:request(Options, Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
 
 Start an initial HTTP/1.1 request, returning the `Connection` on success.
 
