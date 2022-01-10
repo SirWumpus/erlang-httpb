@@ -12,7 +12,13 @@ start() ->
 
 -spec start(Args :: list()) -> {ok, pid()} | {error, any()}.
 start({_Mod, _Fun, _Args} = MFA) ->
-    start([{127,0,0,1}, 8008, ".", ".", MFA]);
+    start([
+        {bind_address, {127,0,0,1}},
+        {port, 8008},
+        {server_root, "."},
+        {document_root, "."},
+        {dispatch_mfa, MFA}
+    ]);
 
 start(Args) ->
     gen_server:start({local, ?MODULE}, ?MODULE, Args, []).
@@ -26,18 +32,14 @@ stop(Server) ->
     gen_server:stop(Server).
 
 -spec init(Args :: list()) -> {ok, any()}.
-init([Bind, Port, SrvRoot, DocRoot, MFA]) ->
+init(Options) ->
     inets:start(),
-    {ok, Server} = inets:start(httpd, [
+    {ok, Server} = inets:start(httpd, Options ++ [
         {profile, ?MODULE},
         {server_name, atom_to_list(?MODULE)},
-        {bind_address, Bind},
-        {port, Port},
-        {server_root, SrvRoot},
-        {document_root, DocRoot},
-        {dispatch_mfa, MFA},
         {modules, [?MODULE]}
     ], stand_alone),
+    Port = proplists:get_value(port, Options),
     io:format("~s~p ready ~p port=~p~n", [?MODULE, self(), Server, Port]),
     {ok, Server}.
 
