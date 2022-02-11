@@ -71,7 +71,7 @@ Optional argument `Timeout` specifies a time-out in milliseconds; default value 
 
 - - -
 ### httpb:request(Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
-### httpb:request(Options, Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
+### httpb:request(Method, Url, Headers, Body, Options) -> {ok, Connection} | {error, Reason}
 
 Start an initial HTTP/1.1 request, returning the `Connection` on success.
 

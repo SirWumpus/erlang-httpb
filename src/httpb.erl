@@ -38,12 +38,15 @@
 
 -spec request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
 request(Method, Url, Hdrs, Body) ->
-    request(#{socket_opts => []}, Method, Url, Hdrs, Body).
+    request(Method, Url, Hdrs, Body, #{socket_opts => []}).
 
--spec request(Conn :: connection() | options(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
-request(#{socket_opts := _} = Options, Method, Url, Hdrs, Body) when is_list(Url) ->
-    request(Options, Method, list_to_binary(Url), Hdrs, Body);
-request(#{socket_opts := SocketOpts} = Options, Method, Url, Hdrs, Body) ->
+-spec request
+    (Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body(), Options :: options()) -> ret_conn() ;
+    (Conn :: connection(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn() .
+
+request(Method, Url, Hdrs, Body, #{socket_opts := _} = Options) when is_list(Url) ->
+    request(Method, list_to_binary(Url), Hdrs, Body, Options);
+request(Method, Url, Hdrs, Body, #{socket_opts := SocketOpts} = Options) ->
     Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
     {ok, {Scheme, _UserInfo, Host, Port, _Path, _Query}} = http_uri:parse(Url),
     case connect(Scheme, Host, Port, SocketOpts, Timeout) of
