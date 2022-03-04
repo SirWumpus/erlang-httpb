@@ -135,7 +135,7 @@ ok
 Copyright
 ---------
 
-Copyright 2021 by Anthony Howe.  All rights reserved.
+Copyright 2021, 2022 by Anthony Howe.  All rights reserved.
 
 
 MIT License
