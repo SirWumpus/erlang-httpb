@@ -108,7 +108,7 @@ hello_dispatch(_Req, "GET", "/chunky") ->
         {content_type, "text/plain"},
         {transfer_encoding, "chunked"}
     ], [
-        "D\r\nHello world.\n\r\n",
+        (integer_to_binary(length(?HELLO), 16)), "\r\n", ?HELLO, "\r\n",
         "6\r\nCiao.\n\r\n",
         "0\r\n\r\n"
     ]};

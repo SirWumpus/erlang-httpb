@@ -213,7 +213,7 @@ req_res_chunks(Config) ->
     {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/chunky", #{}, <<>>),
     {ok, #{status := 200, headers := Headers}} = httpb:response(Conn, ?TIMEOUT),
     true = httpb:is_chunked(Headers),
-    {ok, <<"Hello world.\n">>} = httpb:recv_chunk(Conn),
+    {ok, <<?HELLO>>} = httpb:recv_chunk(Conn),
     {ok, <<"Ciao.\n">>} = httpb:recv_chunk(Conn),
     {ok, <<>>} = httpb:recv_chunk(Conn),
     ok = httpb:close(Conn).
