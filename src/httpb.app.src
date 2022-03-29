@@ -8,8 +8,9 @@
     ssl
    ]},
   {env,[]},
-  {modules, []},
+  {modules, [httpb]},
+  {files,["README.md","LICENSE","Makefile","rebar.config","priv","src","test"]}]}.
 
   {licenses, ["MIT"]},
-  {links, []}
+  {links,[{"Github","https://github.com/SirWumpus/httpb"}]}
  ]}.
