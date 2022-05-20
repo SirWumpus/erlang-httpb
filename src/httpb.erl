@@ -44,9 +44,10 @@ request(Method, Url, Hdrs, Body) ->
     (Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body(), Options :: options()) -> ret_conn() ;
     (Conn :: connection(), Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn() .
 
-request(Method, Url, Hdrs, Body, #{socket_opts := _} = Options) when is_list(Url) ->
+request(Method, Url, Hdrs, Body, Options) when is_atom(Method) andalso is_list(Url) ->
     request(Method, list_to_binary(Url), Hdrs, Body, Options);
-request(Method, Url, Hdrs, Body, #{socket_opts := SocketOpts} = Options) ->
+request(Method, Url, Hdrs, Body, Options) when is_atom(Method) ->
+    SocketOpts = maps:get(socket_opts, Options, []),
     Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
     {ok, {Scheme, _UserInfo, Host, Port, _Path, _Query}} = http_uri:parse(Url),
     case connect(Scheme, Host, Port, SocketOpts, Timeout) of
@@ -57,9 +58,9 @@ request(Method, Url, Hdrs, Body, #{socket_opts := SocketOpts} = Options) ->
         Other
     end;
 
-request(Conn, Method, Url, Hdrs, Body) when is_list(Url) ->
+request(Conn, Method, Url, Hdrs, Body) when is_map(Conn) andalso is_list(Url) ->
     request(Conn, Method, list_to_binary(Url), Hdrs, Body);
-request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
+request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_map(Conn) ->
     {ok, {_Scheme, _UserInfo, _Host, _Port, Path, Query}} = http_uri:parse(Url),
     Req0 = <<(method(Method))/binary, " ", (path(Path, Query))/binary, " HTTP/1.1\r\n">>,
     Req1 = headers(Req0, Hdrs#{host => <<Host/binary, $:, (integer_to_binary(Port))/binary>>}),
