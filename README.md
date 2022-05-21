@@ -121,7 +121,7 @@ See `inet:setopts/2` or `ssl:setopts/2`.
 Examples
 --------
 
-```
+```erlang
 1> {ok, Conn} = httpb:request(get, "https://example.com/", #{}, <<>>).
 {ok,#{host => <<"example.com">>,port => 443,scheme => https,
       socket =>
@@ -147,7 +147,7 @@ ok
 
 If the connection is not going to be reused for more requests, the above can be done using the helper function `one_request/4,5`:
 
-```
+```erlang
 1> httpb:one_request(get, "https://example.com/", #{}, <<>>).
 {ok,#{body =>
           <<"<!doctype html>\n<html>\n<head>\n    <title>Example Domain</title>\n\n    <meta charset=\"utf-8\" />\n    <meta "...>>,
@@ -167,7 +167,7 @@ If the connection is not going to be reused for more requests, the above can be 
 
 It is possible to send multiple requests over the same connection:
 
-```
+```erlang
 1> {ok, Conn} = httpb:request(get, "http://snert.com/about.html", #{}, <<>>).
 {ok,#{host => <<"snert.com">>,method => get,port => 80,
       scheme => http,socket => #Port<0.7>}}
