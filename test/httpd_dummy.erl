@@ -120,5 +120,12 @@ hello_dispatch(#mod{parsed_header = Headers, entity_body = Body}, _Method, "/ech
         {content_type, ContentType},
         {content_length, integer_to_list(length(Body))}
     ], Body};
+hello_dispatch(_Req, "GET", "/source") ->
+    SrcPath = filename:join([filename:dirname(code:which(?MODULE)), "httpd_dummy.erl"]),
+    {ok, Source} = file:read_file(SrcPath),
+    {200, [
+        {content_type, "text/plain"},
+        {content_length, integer_to_list(byte_size(Source))}
+    ], binary_to_list(Source)};
 hello_dispatch(_Req, _Method, _Path) ->
     {404, [], []}.

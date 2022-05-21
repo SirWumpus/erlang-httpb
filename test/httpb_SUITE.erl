@@ -31,6 +31,7 @@ basic() ->
         req_res_timeout,
         req_res_not_found,
         req_res_body,
+        req_res_body_source,
         req_head_res,
         req_query_res,
         req_options_res,
@@ -56,6 +57,7 @@ ssl() ->
         req_res_timeout,
         req_res_not_found,
         req_res_body,
+        req_res_body_source,
         req_head_res,
         req_query_res,
         req_options_res,
@@ -196,6 +198,14 @@ req_res_body(Config) ->
     {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello", #{}, <<>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn),
     ok = httpb:close(Conn).
+
+req_res_body_source(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/source", #{}, <<>>),
+    {ok, Result} = httpb:response(Conn),
+    ok = httpb:close(Conn),
+    httpb:body_length(Result) =:= httpb:content_length(Result).
 
 req_head_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
