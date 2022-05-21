@@ -10,12 +10,12 @@ Data Types
 * Url               :: string() | binary().
 * Body              :: binary().
 * Data              :: binary().
-* Headers           :: map().
+* Headers           :: #{atom() => binary()}.
 * Reason            :: term().
-* Method            :: get | head | options | post | put | delete.
+* Method            :: connect | delete | get | head | options | post | put | trace.
 * Result            :: #{status => integer(), headers => headers(), body => body()}.
 * Socket            :: gen_tcp:socket() | ssl:sslsocket().
-* Options           :: #{socket_opts => list(), timeout => timeout()}.
+* Options           :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
 * Connection        :: #{scheme => http | https, host => string(), port => non_neg_integer(), socket => socket()}.
 
 
@@ -75,10 +75,18 @@ Optional argument `Timeout` specifies a time-out in milliseconds; default value 
 
 Start an initial HTTP/1.1 request, returning the `Connection` on success.
 
+The `Options` map can contain `socket_opts` and/or `timeout`.  `socket_opts` is a property list of socket options passed through to `gen_tcp:connect/4` or `ssl:connect/4`.  The connection `timeout` defaults to 30000 milliseconds.
+
 - - -
 ### httpb:request(Connection, Method, Url, Headers, Body) -> {ok, Connection} | {error, Reason}
 
 Given an already open connection, send a request.
+
+`Headers` is a map keyed by header names as atoms, eg. `accept` or `content_type`, underscores will be converted to hyphens (-).  The values must be binary strings.  A `host` header will be generated from the `Connection` host and port, not the `Url`.
+
+By design there is no help with the `content_length` header; its under the caller's control.  Its possible to specify a non-zero `content_length` and provide an initially empty body.  The caller should follow a successful request with `httpb:send(Connection, Body)`.
+
+The `Body` argument is ignored for `head` and `trace` methods.  To support `OPTIONS * HTTP/1.1`, specify a `Url` like `http://localhost/*`, which only applies to the `options` method.
 
 - - -
 ### httpb:response(Connection) -> {ok, Result} | {error, Reason}
