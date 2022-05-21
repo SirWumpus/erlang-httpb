@@ -43,7 +43,7 @@ one_request(Method, Url, Hdrs, Body) ->
 
 -spec one_request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body(), Options :: options()) -> ret_result().
 one_request(Method, Url, Hdrs, Body, Options) ->
-    case request(Method, Url, Hdrs, Body, Options) of
+    case request(Method, Url, Hdrs#{connection => <<"close">>}, Body, Options) of
     {ok, Conn} ->
         Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
         Result = response(Conn, Timeout),
