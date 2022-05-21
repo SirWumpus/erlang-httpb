@@ -49,7 +49,10 @@ request(Method, Url, Hdrs, Body, Options) when is_atom(Method) andalso is_list(U
 request(Method, Url, Hdrs, Body, Options) when is_atom(Method) ->
     SocketOpts = maps:get(socket_opts, Options, []),
     Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
-    {ok, {Scheme, _UserInfo, Host, Port, _Path, _Query}} = http_uri:parse(Url),
+    UriMap = uri_string:parse(Url),
+    Scheme = binary_to_atom(maps:get(scheme, UriMap)),
+    Host = maps:get(host, UriMap, <<"localhost">>),
+    Port = maps:get(port, UriMap, scheme_to_port(Scheme)),
     case connect(Scheme, Host, Port, SocketOpts, Timeout) of
     {ok, Socket} ->
         Conn = #{scheme => Scheme, host => Host, port => Port, socket => Socket},
@@ -61,8 +64,15 @@ request(Method, Url, Hdrs, Body, Options) when is_atom(Method) ->
 request(Conn, Method, Url, Hdrs, Body) when is_map(Conn) andalso is_list(Url) ->
     request(Conn, Method, list_to_binary(Url), Hdrs, Body);
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_map(Conn) ->
-    {ok, {_Scheme, _UserInfo, _Host, _Port, Path, Query}} = http_uri:parse(Url),
-    Req0 = <<(method(Method))/binary, " ", (path(Path, Query))/binary, " HTTP/1.1\r\n">>,
+    UrlMap = uri_string:parse(Url),
+    Path1 = case maps:get(path, UrlMap, <<"/">>) of
+    <<>> ->
+        <<"/">>;
+    Path0 ->
+        Path0
+    end,
+    Query = maps:get(query, UrlMap, <<>>),
+    Req0 = <<(method(Method))/binary, " ", (path(Path1, Query))/binary, " HTTP/1.1\r\n">>,
     Req1 = headers(Req0, Hdrs#{host => <<Host/binary, $:, (integer_to_binary(Port))/binary>>}),
     case send(Conn, Req1) of
     ok ->
@@ -76,6 +86,12 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_m
     Other ->
         Other
     end.
+
+-spec scheme_to_port(atom()) -> non_neg_integer().
+scheme_to_port(http) ->
+    80;
+scheme_to_port(https) ->
+    443.
 
 -spec method(Method :: method()) -> binary().
 method(get) ->
