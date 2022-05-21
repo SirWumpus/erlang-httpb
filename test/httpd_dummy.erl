@@ -1,8 +1,10 @@
 -module(httpd_dummy).
 -behaviour(gen_server).
 
-% This should only be used in test suites.
--compile(export_all).
+-export([
+	start/0, start/1, start_link/1, stop/1, init/1, terminate/2,
+	handle_call/3, handle_cast/2, handle_info/2, do/1, reply_hello/2
+]).
 
 -include_lib("inets/include/httpd.hrl").
 
@@ -43,15 +45,9 @@ init(Options) ->
     io:format("~s~p ready ~p port=~p~n", [?MODULE, self(), Server, Port]),
     {ok, Server}.
 
--spec terminate(State :: any()) -> any().
-terminate(State) ->
-    try
-        Result = inets:stop(stand_alone, State),
-        io:format("~s~p stopped ~p ~p~n", [?MODULE, self(), State, Result])
-    catch
-        What ->
-            io:format("~s~p ~p~n", [?MODULE, self(), What])
-    end.
+-spec terminate(Reason :: term(), State :: any()) -> any().
+terminate(_Reason, State) ->
+    ok = inets:stop(stand_alone, State).
 
 handle_call(Request, _From, State) ->
     % Unknown request, no change.
@@ -87,6 +83,12 @@ reply_hello(Req = #mod{method = Method, request_uri = Uri}, _Args) ->
     {Status :: integer(), Headers :: list(), Body :: list()}.
 hello_dispatch(_Req, _Method, "/") ->
     {204, [], []};
+hello_dispatch(_Req, "OPTIONS", "*") ->
+    {200, [
+        {allow, "GET, HEAD, OPTIONS, POST"},
+        {content_type, "text/plain"},
+        {content_length, "0"}
+    ], []};
 hello_dispatch(_Req, "OPTIONS", "/hello") ->
     {200, [
         {allow, "GET, HEAD, POST"},

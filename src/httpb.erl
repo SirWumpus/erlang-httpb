@@ -14,21 +14,21 @@
 ]).
 
 -ifdef(TEST).
--compile(export_all).
+-export([has_body/2]).
 -endif.
 
 -define(DEFAULT_TIMEOUT, 30000).
 
 -type url()             :: string() | binary().
 -type body()            :: binary().
--type headers()         :: map().
+-type headers()         :: #{atom() => binary()}.
 -type reason()          :: term().
 -type error()           :: {error, reason()}.
 -type scheme()          :: http | https.
--type method()          :: get | head | options | post | put | delete.
+-type method()          :: connect | delete | get | head | options | post | put | trace.
 -type result()          :: #{status => integer(), headers => headers(), body => body()}.
 -type socket()          :: gen_tcp:socket() | ssl:sslsocket().
--type options()         :: #{socket_opts => list(), timeout => timeout()}.
+-type options()         :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
 -type connection()      :: #{scheme => scheme(), host => string() | binary(), port => non_neg_integer(), socket => socket()}.
 
 -type ret_ok()          :: ok | error().
@@ -65,10 +65,12 @@ request(Conn, Method, Url, Hdrs, Body) when is_map(Conn) andalso is_list(Url) ->
     request(Conn, Method, list_to_binary(Url), Hdrs, Body);
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_map(Conn) ->
     UrlMap = uri_string:parse(Url),
-    Path1 = case maps:get(path, UrlMap, <<"/">>) of
-    <<>> ->
+    Path1 = case {Method, maps:get(path, UrlMap, <<"/">>)} of
+    {_, <<>>} ->
         <<"/">>;
-    Path0 ->
+    {options, <<"/*">>} ->
+        <<"*">>;
+    {_, Path0} ->
         Path0
     end,
     Query = maps:get(query, UrlMap, <<>>),
@@ -76,12 +78,20 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_m
     Req1 = headers(Req0, Hdrs#{host => <<Host/binary, $:, (integer_to_binary(Port))/binary>>}),
     case send(Conn, Req1) of
     ok ->
-        case send(Conn, Body) of
-        ok ->
-            ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
-            {ok, Conn#{method => Method}};
-        Other ->
-            Other
+        ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
+        Conn1 = Conn#{method => Method},
+        case Method of
+        head ->
+            {ok, Conn1};
+        trace ->
+            {ok, Conn1};
+        _ ->
+            case send(Conn, Body) of
+            ok ->
+                {ok, Conn1};
+            Other ->
+                Other
+            end
         end;
     Other ->
         Other
@@ -105,7 +115,11 @@ method(post) ->
 method(put) ->
     <<"PUT">>;
 method(delete) ->
-    <<"DELETE">>.
+    <<"DELETE">>;
+method(trace) ->
+    <<"TRACE">>;
+method(connect) ->
+    <<"CONNECT">>.
 
 -spec path(Path :: binary(), Query :: binary() | undefined) -> binary().
 path(Path, <<>>) ->
@@ -128,13 +142,13 @@ close(#{scheme := http, socket := Socket}) ->
 close(#{scheme := https, socket := Socket}) ->
     ssl:close(Socket).
 
--spec getopts(Conn :: connection(), Options :: list()) -> ret_ok().
+-spec getopts(Conn :: connection(), Options :: proplists:proplist()) -> ret_ok().
 getopts(#{scheme := http, socket := Socket}, Options) ->
     inet:getopts(Socket, Options);
 getopts(#{scheme := https, socket := Socket}, Options) ->
     ssl:getopts(Socket, Options).
 
--spec setopts(Conn :: connection(), Options :: list()) -> ret_ok().
+-spec setopts(Conn :: connection(), Options :: proplists:proplist()) -> ret_ok().
 setopts(#{scheme := http, socket := Socket}, Options) ->
     inet:setopts(Socket, Options);
 setopts(#{scheme := https, socket := Socket}, Options) ->

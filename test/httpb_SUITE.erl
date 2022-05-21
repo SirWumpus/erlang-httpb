@@ -34,6 +34,8 @@ basic() ->
         req_head_res,
         req_query_res,
         req_options_res,
+        req_options_star_res,
+        req_trace_res,
         req_res_chunks,
         req_res_req_res,
         req_put_res,
@@ -56,6 +58,8 @@ ssl() ->
         req_head_res,
         req_query_res,
         req_options_res,
+        req_options_star_res,
+        req_trace_res,
         req_res_chunks,
         req_res_req_res,
         req_put_res,
@@ -205,6 +209,23 @@ req_options_res(Config) ->
     {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/hello", #{}, <<>>),
     % httpd does not support OPTIONS yet.
     {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_options_star_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/*", #{}, <<>>),
+    % httpd does not support OPTIONS yet.
+    {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_trace_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(trace, Scheme++"://localhost:8008/", #{}, <<>>),
+    % httpd implements TRACE incorrectly, see
+    % https://datatracker.ietf.org/doc/html/rfc7231#section-4.3.8
+    {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
 req_res_chunks(Config) ->
