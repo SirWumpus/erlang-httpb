@@ -11,7 +11,7 @@
     request/4, request/5, response/1, response/2,
     is_chunked/1, is_keep_alive/1, content_length/1, send_chunk/2, recv_chunk/1, recv_chunk/2,
     close/1, recv/2, recv/3, send/2, getopts/2, setopts/2, controlling_process/2,
-    one_request/4, one_request/5
+    one_request/4, one_request/5, body_length/1
 ]).
 
 -ifdef(TEST).
@@ -244,6 +244,10 @@ content_length(#{content_length := Length}) ->
 content_length(_Hdrs) ->
     0.
 
+-spec body_length(Res :: result()) -> integer().
+body_length(Res) ->
+    byte_size(maps:get(body, Res)).
+
 -spec has_body(Conn :: connection(), Res :: result()) -> boolean().
 has_body(#{method := head}, _Res) ->
     false;
@@ -361,6 +365,8 @@ recv_chunk(#{socket := Socket} = Conn, Timeout) ->
 send_chunk(Conn, Data) ->
     Hex = integer_to_binary(byte_size(Data), 16),
     case send(Conn, <<Hex/binary, "\r\n">>) of
-    ok -> send(Conn, <<Data/binary, "\r\n">>);
-    Other -> Other
+    ok ->
+        send(Conn, <<Data/binary, "\r\n">>);
+    Other ->
+        Other
     end.
