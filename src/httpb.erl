@@ -30,7 +30,7 @@
 -type result()          :: #{status => integer(), headers => headers(), body => body()}.
 -type socket()          :: gen_tcp:socket() | ssl:sslsocket().
 -type options()         :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
--type connection()      :: #{scheme => scheme(), host => string() | binary(), port => non_neg_integer(), socket => socket()}.
+-type connection()      :: #{scheme => scheme(), host => string() | binary(), port => non_neg_integer(), socket => socket(), method => method()}.
 
 -type ret_ok()          :: ok | error().
 -type ret_data()        :: {ok, binary()} | error().
