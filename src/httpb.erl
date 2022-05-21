@@ -305,8 +305,14 @@ response(#{socket := Socket} = Conn, Timeout, Res) ->
         end;
     {_Type, Socket, Data} ->
         % _Type :: tcp | ssl
-        Body = maps:get(body, Res, <<>>),
-        {ok, Res#{body => <<Body/binary, Data/binary>>}};
+        Body = <<(maps:get(body, Res, <<>>))/binary, Data/binary>>,
+        case byte_size(Body) < content_length(Res) of
+        true ->
+            ok = setopts(Conn, [{active, once}]),
+            response(Conn, Timeout, Res#{body => Body});
+        false ->
+            {ok, Res#{body => Body}}
+        end;
     Other ->
         {error, Other}
     after Timeout ->
