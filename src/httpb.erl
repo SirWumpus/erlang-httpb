@@ -10,7 +10,8 @@
 -export([
     request/4, request/5, response/1, response/2,
     is_chunked/1, is_keep_alive/1, content_length/1, send_chunk/2, recv_chunk/1, recv_chunk/2,
-    close/1, recv/2, recv/3, send/2, getopts/2, setopts/2, controlling_process/2
+    close/1, recv/2, recv/3, send/2, getopts/2, setopts/2, controlling_process/2,
+    one_request/4, one_request/5
 ]).
 
 -ifdef(TEST).
@@ -35,6 +36,22 @@
 -type ret_data()        :: {ok, binary()} | error().
 -type ret_conn()        :: {ok, connection()} | error().
 -type ret_result()      :: {ok, result()} | error().
+
+-spec one_request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_result().
+one_request(Method, Url, Hdrs, Body) ->
+    one_request(Method, Url, Hdrs, Body, #{}).
+
+-spec one_request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body(), Options :: options()) -> ret_result().
+one_request(Method, Url, Hdrs, Body, Options) ->
+    case request(Method, Url, Hdrs, Body, Options) of
+    {ok, Conn} ->
+        Timeout = maps:get(timeout, Options, ?DEFAULT_TIMEOUT),
+        Result = response(Conn, Timeout),
+        close(Conn),
+        Result;
+    Other ->
+        Other
+    end.
 
 -spec request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
 request(Method, Url, Hdrs, Body) ->

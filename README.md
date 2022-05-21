@@ -52,6 +52,12 @@ Return true if `Transfer-Encoding` is present and equal to `chunked`.
 Return false if `Connection` header is present and equal to `close`; otherwise true.
 
 - - -
+### one_request(Method, Url, Headers, Body) -> {ok, Result} | {error, Reason}
+### one_request(Method, Url, Headers, Body, Options) -> {ok, Result} | {error, Reason}
+
+A helper function for when the caller needs only make a single request and close the connection.
+
+- - -
 ### httpb:recv(Connection, Length) -> {ok, Data} | {error, Reason}
 ### httpb:recv(Connection, Length, Timeout) -> {ok, Data} | {error, Reason}
 
@@ -116,12 +122,12 @@ Examples
 --------
 
 ```
-1> {ok, C} = httpb:request(get, "https://example.com/", #{}, <<>>).
+1> {ok, Conn} = httpb:request(get, "https://example.com/", #{}, <<>>).
 {ok,#{host => <<"example.com">>,port => 443,scheme => https,
       socket =>
           {sslsocket,{gen_tcp,#Port<0.5>,tls_connection,undefined},
                      [<0.113.0>,<0.112.0>]}}}
-2> {ok, R} = httpb:response(C).
+2> {ok, Result} = httpb:response(Conn).
 {ok,#{body =>
           <<"<!doctype html>\n<html>\n<head>\n    <title>Example Domain</title>\n\n ... </html>\n">>,
       headers =>
@@ -135,8 +141,28 @@ Examples
             server => <<"ECS (chb/0286)">>,
             vary => <<"Accept-Encoding">>,x_cache => <<"HIT">>},
       status => 200}}
-3> httpb:close(C).
+3> httpb:close(Conn).
 ok
+```
+
+If the connection is not going to be reused for more requests, the above can be done using the helper function `one_request/4,5`:
+
+```
+1> httpb:one_request(get, "https://example.com/", #{}, <<>>).
+{ok,#{body =>
+          <<"<!doctype html>\n<html>\n<head>\n    <title>Example Domain</title>\n\n    <meta charset=\"utf-8\" />\n    <meta "...>>,
+      headers =>
+          #{age => <<"554779">>,cache_control => <<"max-age=604800">>,
+            content_length => <<"1256">>,
+            content_type => <<"text/html; charset=UTF-8">>,
+            date => <<"Sat, 21 May 2022 13:01:06 GMT">>,
+            etag => <<"\"3147526947+ident\"">>,
+            expires => <<"Sat, 28 May 2022 13:01:06 GMT">>,
+            last_modified => <<"Thu, 17 Oct 2019 07:18:26 GMT">>,
+            server => <<"ECS (chb/0286)">>,
+            vary => <<"Accept-Encoding">>,x_cache => <<"HIT">>},
+      status => 200}}
+2>
 ```
 
 
