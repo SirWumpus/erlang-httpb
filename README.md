@@ -165,6 +165,45 @@ If the connection is not going to be reused for more requests, the above can be 
 2>
 ```
 
+It is possible to send multiple requests over the same connection:
+
+```
+1> {ok, Conn} = httpb:request(get, "http://snert.com/about.html", #{}, <<>>).
+{ok,#{host => <<"snert.com">>,method => get,port => 80,
+      scheme => http,socket => #Port<0.7>}}
+2> {ok, About} = httpb:response(Conn).
+{ok,#{body =>
+          <<"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\">\n<html>\n<head>\n<meta http-equiv=\"Content-Type\" "...>>,
+      headers =>
+          #{accept_ranges => <<"bytes">>,connection => <<"keep-alive">>,
+            content_length => <<"5090">>,
+            content_type => <<"text/html">>,
+            date => <<"Sat, 21 May 2022 14:49:49 GMT">>,
+            etag => <<"\"56fbba85-13e2\"">>,
+            last_modified => <<"Wed, 30 Mar 2016 11:37:41 GMT">>,
+            server => <<"nginx/1.13.0">>},
+      status => 200}}
+3> {ok, Conn} = httpb:request(Conn, get, "http://snert.com/snert.html", #{}, <<>>).
+{ok,#{host => <<"snert.com">>,method => get,port => 80,
+      scheme => http,socket => #Port<0.7>}}
+4> {ok, Snert} = httpb:response(Conn).
+{ok,#{body =>
+          <<"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\">\n<html>\n<head>\n<meta http-equiv=\"Content-Type\" "...>>,
+      headers =>
+          #{accept_ranges => <<"bytes">>,connection => <<"keep-alive">>,
+            content_length => <<"4436">>,
+            content_type => <<"text/html">>,
+            date => <<"Sat, 21 May 2022 14:49:49 GMT">>,
+            etag => <<"\"5324973c-1154\"">>,
+            last_modified => <<"Sat, 15 Mar 2014 18:09:00 GMT">>,
+            server => <<"nginx/1.13.0">>},
+      status => 200}}
+5> httpb:close(Conn).
+ok
+```
+
+Note that pipelining, sending multple requests before reading any responses, does not appear to work at this time.
+
 
 Copyright
 ---------
