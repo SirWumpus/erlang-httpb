@@ -38,6 +38,7 @@ basic() ->
         req_trace_res,
         req_res_chunks,
         req_res_req_res,
+        req_req_res_res,
         req_put_res,
         req_delete_res,
         req_post_echo,
@@ -62,6 +63,7 @@ ssl() ->
         req_trace_res,
         req_res_chunks,
         req_res_req_res,
+        req_req_res_res,
         req_put_res,
         req_delete_res,
         req_post_echo,
@@ -109,6 +111,14 @@ end_per_group(Group, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     Server = proplists:get_value(server, Config),
     ok = httpd_dummy:stop(Server).
+
+init_per_testcase(req_req_res_res, _Config) ->
+    {skip, "pipelining not supported"};
+init_per_testcase(_Test, Config) ->
+    Config.
+
+end_per_testcase(_Test, Config) ->
+    Config.
 
 already_closed(Config) ->
     Scheme = proplists:get_value(scheme, Config),
@@ -239,12 +249,30 @@ req_res_chunks(Config) ->
     {ok, <<>>} = httpb:recv_chunk(Conn),
     ok = httpb:close(Conn).
 
+% Synchronised request-response.
 req_res_req_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello", #{}, <<>>),
     {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, Conn} = httpb:request(Conn, get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
+    {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+% Pipelined requests.
+%
+% This currently doesn't work given how httpb:response/3 is implemented using
+% {packet, http_bin}.  To make pipeling work, we'd have to redo response/3 to
+% handle all the HTTP protocol and only read Content-Length bytes per response
+% after the status line and headers so as to avoid reading the start of the
+% next queued response.
+%
+req_req_res_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello", #{}, <<>>),
+    {ok, Conn} = httpb:request(Conn, get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     {ok, #{status := 404}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
