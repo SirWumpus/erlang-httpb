@@ -45,7 +45,8 @@ basic() ->
         req_post_echo,
         req_post_send_echo,
         req_post_chunk_echo,
-        req_post_chunk_fail
+        req_post_chunk_fail,
+        one_request
     ].
 
 ssl() ->
@@ -71,7 +72,8 @@ ssl() ->
         req_post_echo,
         req_post_send_echo,
         req_post_chunk_echo,
-        req_post_chunk_fail
+        req_post_chunk_fail,
+        one_request
     ].
 
 init_per_suite(Config)->
@@ -344,3 +346,8 @@ req_post_chunk_fail(Config) ->
     }, <<>>),
     ok = httpb:close(Conn),
     {error, closed} = httpb:send_chunk(Conn, <<?HELLO>>).
+
+one_request(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:one_request(get, Scheme++"://localhost:8008/hello", #{}, <<>>).

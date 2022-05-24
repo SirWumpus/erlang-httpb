@@ -40,6 +40,6 @@ ct:
 logs: test
 	lynx _build/test/logs/index.html
 
-cover: test
+view:
 	lynx _build/test/cover/index.html
 
