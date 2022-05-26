@@ -163,13 +163,17 @@ close(#{scheme := https, socket := Socket}) ->
 getopts(#{scheme := http, socket := Socket}, Options) ->
     inet:getopts(Socket, Options);
 getopts(#{scheme := https, socket := Socket}, Options) ->
-    ssl:getopts(Socket, Options).
+    ssl:getopts(Socket, Options);
+getopts(_Conn, _Options) ->
+    {error, bad_connection}.
 
 -spec setopts(Conn :: connection(), Options :: proplists:proplist()) -> ret_ok().
 setopts(#{scheme := http, socket := Socket}, Options) ->
     inet:setopts(Socket, Options);
 setopts(#{scheme := https, socket := Socket}, Options) ->
-    ssl:setopts(Socket, Options).
+    ssl:setopts(Socket, Options);
+setopts(_Conn, _Options) ->
+    {error, bad_connection}.
 
 -spec send(Conn :: connection(), Data :: binary()) -> ret_ok().
 send(_Conn, <<>>) ->

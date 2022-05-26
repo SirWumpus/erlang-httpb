@@ -32,6 +32,7 @@ test: dialyzer ct
 	rebar3 cover
 
 dialyzer:
+	rebar3 cover --reset
 	-rebar3 dialyzer
 
 ct:

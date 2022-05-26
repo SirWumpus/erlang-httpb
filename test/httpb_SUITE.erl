@@ -24,6 +24,7 @@ basic() ->
     [
         already_closed,
         is_keep_alive,
+        bad_connection,
         has_body,
         connect_fail,
         req_close,
@@ -52,6 +53,9 @@ basic() ->
 ssl() ->
     [
         ssl_already_closed,
+        is_keep_alive,
+        bad_connection,
+        has_body,
         connect_fail,
         req_close,
         req_res,
@@ -145,6 +149,12 @@ is_keep_alive(Config) ->
     true = httpb:is_keep_alive(#{connection => <<"other">>}),
     false = httpb:is_keep_alive(#{connection => <<"close">>}),
     false = httpb:is_keep_alive(#{headers => #{connection => <<"close">>}}).
+
+bad_connection(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {error, bad_connection} = httpb:getopts(woot, #{}),
+    {error, bad_connection} = httpb:setopts(woot, #{}).
 
 has_body(Config) ->
     Scheme = proplists:get_value(scheme, Config),
