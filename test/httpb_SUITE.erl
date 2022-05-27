@@ -213,7 +213,7 @@ req_res_body_source(Config) ->
     {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/source", #{}, <<>>),
     {ok, Result} = httpb:response(Conn),
     ok = httpb:close(Conn),
-    httpb:body_length(Result) =:= httpb:content_length(Result).
+    true = httpb:body_length(Result) =:= httpb:content_length(Result).
 
 req_head_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
