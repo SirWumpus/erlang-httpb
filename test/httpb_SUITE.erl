@@ -120,8 +120,6 @@ end_per_group(Group, Config) ->
     Server = proplists:get_value(server, Config),
     ok = httpd_dummy:stop(Server).
 
-init_per_testcase(req_req_res_res, _Config) ->
-    {skip, "pipelining not supported"};
 init_per_testcase(_Test, Config) ->
     Config.
 
@@ -191,9 +189,7 @@ req_res(Config) ->
 req_res_timeout(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
-    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/bogus", #{}, <<>>),
-    {ok, [{active, once}]} = httpb:getopts(Conn, [active]),
-    ok = httpb:setopts(Conn, [{active, false}]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/hello/timeout", #{}, <<>>),
     {error, timeout} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
@@ -282,13 +278,6 @@ req_res_req_res(Config) ->
     ok = httpb:close(Conn).
 
 % Pipelined requests.
-%
-% This currently doesn't work given how httpb:response/3 is implemented using
-% {packet, http_bin}.  To make pipeling work, we'd have to redo response/3 to
-% handle all the HTTP protocol and only read Content-Length bytes per response
-% after the status line and headers so as to avoid reading the start of the
-% next queued response.
-%
 req_req_res_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),

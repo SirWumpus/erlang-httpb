@@ -202,8 +202,6 @@ It is possible to send multiple requests over the same connection:
 ok
 ```
 
-Note that pipelining, sending multple requests before reading any responses, does not appear to work at this time.
-
 
 Copyright
 ---------

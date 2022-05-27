@@ -95,7 +95,6 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_m
     Req1 = headers(Req0, Hdrs#{host => <<Host/binary, $:, (integer_to_binary(Port))/binary>>}),
     case send(Conn, Req1) of
     ok ->
-        ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
         Conn1 = Conn#{method => Method},
         case Method of
         head ->
@@ -270,6 +269,7 @@ response(Conn) ->
 
 -spec response(Conn :: connection(), Timeout :: timeout()) -> ret_result().
 response(Conn, Timeout) ->
+    ok = setopts(Conn, [{active, once}, {packet, http_bin}]),
     response(Conn, Timeout, #{status => 0, headers => #{}, body => <<>>}).
 
 -spec response(Conn :: connection(), Timeout :: timeout(), Res :: result()) -> ret_result().
@@ -304,22 +304,16 @@ response(#{socket := Socket} = Conn, Timeout, Res) ->
     {_Type, Socket, http_eoh} ->
         case has_body(Conn, Res) of
         true ->
-            % Read as much of the body as possible.
-            ok = setopts(Conn, [{active, once}, {packet, raw}]),
-            response(Conn, Timeout, Res);
+            ok = setopts(Conn, [{packet, raw}]),
+            case recv(Conn, content_length(Res), Timeout) of
+            {ok, Data} ->
+                {ok, Res#{body => Data}};
+            Other ->
+                Other
+            end;
         false ->
             % Stop reading before first chunk.
             {ok, Res}
-        end;
-    {_Type, Socket, Data} ->
-        % _Type :: tcp | ssl
-        Body = <<(maps:get(body, Res, <<>>))/binary, Data/binary>>,
-        case byte_size(Body) < content_length(Res) of
-        true ->
-            ok = setopts(Conn, [{active, once}]),
-            response(Conn, Timeout, Res#{body => Body});
-        false ->
-            {ok, Res#{body => Body}}
         end;
     Other ->
         {error, Other}

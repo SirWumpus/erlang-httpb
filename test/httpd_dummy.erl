@@ -105,6 +105,11 @@ hello_dispatch(_Req, "GET", "/hello") ->
         {content_type, "text/plain"},
         {content_length, integer_to_list(length(?HELLO))}
     ], [?HELLO]};
+hello_dispatch(_Req, "GET", "/hello/timeout") ->
+    {200, [
+        {content_type, "text/plain"},
+        {content_length, integer_to_list(length(?HELLO))}
+    ], []}; % Missing body to force client side timeout.
 hello_dispatch(_Req, "GET", "/chunky") ->
     {200, [
         {content_type, "text/plain"},
