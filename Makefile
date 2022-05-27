@@ -36,11 +36,10 @@ dialyzer:
 	-rebar3 dialyzer
 
 ct:
-	-rebar3 ct --cover
+	-rebar3 ct --cover --verbose --readable true
 
 logs: test
 	lynx _build/test/logs/index.html
 
 view:
 	lynx _build/test/cover/index.html
-
