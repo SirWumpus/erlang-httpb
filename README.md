@@ -52,8 +52,8 @@ Return true if `Transfer-Encoding` is present and equal to `chunked`.
 Return false if `Connection` header is present and equal to `close`; otherwise true.
 
 - - -
-### one_request(Method, Url, Headers, Body) -> {ok, Result} | {error, Reason}
-### one_request(Method, Url, Headers, Body, Options) -> {ok, Result} | {error, Reason}
+### httpb:one_request(Method, Url, Headers, Body) -> {ok, Result} | {error, Reason}
+### httpb:one_request(Method, Url, Headers, Body, Options) -> {ok, Result} | {error, Reason}
 
 A helper function for when the caller needs only make a single request and close the connection.
 
