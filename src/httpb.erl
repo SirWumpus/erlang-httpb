@@ -26,7 +26,7 @@
 -type reason()          :: term().
 -type error()           :: {error, reason()}.
 -type scheme()          :: http | https.
--type method()          :: connect | delete | get | head | options | post | put | trace.
+-type method()          :: delete | get | head | options | post | put | trace.
 -type result()          :: #{status => integer(), headers => headers(), body => body()}.
 -type socket()          :: gen_tcp:socket() | ssl:sslsocket().
 -type options()         :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
@@ -133,9 +133,7 @@ method(put) ->
 method(delete) ->
     <<"DELETE">>;
 method(trace) ->
-    <<"TRACE">>;
-method(connect) ->
-    <<"CONNECT">>.
+    <<"TRACE">>.
 
 -spec path(Path :: binary(), Query :: binary() | undefined) -> binary().
 path(Path, <<>>) ->

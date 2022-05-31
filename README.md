@@ -12,7 +12,7 @@ Data Types
 * Data              :: binary().
 * Headers           :: #{atom() => binary()}.
 * Reason            :: term().
-* Method            :: connect | delete | get | head | options | post | put | trace.
+* Method            :: delete | get | head | options | post | put | trace.
 * Result            :: #{status => integer(), headers => headers(), body => body()}.
 * Socket            :: gen_tcp:socket() | ssl:sslsocket().
 * Options           :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
