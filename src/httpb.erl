@@ -145,10 +145,11 @@ path(Path, Query) ->
 connect(Scheme, Host, Port, Options, Timeout) when is_binary(Host) ->
     connect(Scheme, binary_to_list(Host), Port, Options, Timeout);
 connect(http, Host, Port, Options, Timeout) ->
-    gen_tcp:connect(Host, Port, [binary | Options], Timeout);
+    % Set active=false to prevent early read of packets.
+    gen_tcp:connect(Host, Port, [binary, {active, false} | Options], Timeout);
 connect(https, Host, Port, Options, Timeout) ->
     ssl:start(),
-    ssl:connect(Host, Port, [binary | Options], Timeout).
+    ssl:connect(Host, Port, [binary, {active, false} | Options], Timeout).
 
 -spec close(Conn :: connection()) -> ret_ok().
 close(#{scheme := http, socket := Socket}) ->

@@ -33,6 +33,7 @@ basic() ->
         req_res_not_found,
         req_res_body,
         req_res_body_source,
+        req_res_example_com,
         req_head_res,
         req_query_res,
         req_options_res,
@@ -63,6 +64,7 @@ ssl() ->
         req_res_not_found,
         req_res_body,
         req_res_body_source,
+        req_res_example_com,
         req_head_res,
         req_query_res,
         req_options_res,
@@ -119,6 +121,9 @@ end_per_group(Group, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     Server = proplists:get_value(server, Config),
     ok = httpd_dummy:stop(Server).
+
+init_per_testcase(req_res_example_com, _Config) ->
+    {skip, external_network};
 
 init_per_testcase(_Test, Config) ->
     Config.
@@ -214,6 +219,15 @@ req_res_body_source(Config) ->
     {ok, Result} = httpb:response(Conn),
     ok = httpb:close(Conn),
     true = httpb:body_length(Result) =:= httpb:content_length(Result).
+
+req_res_example_com(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://example.com/", #{}, <<>>),
+    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
+    {ok, #{status := 200}} = httpb:response(Conn, ?TIMEOUT),
+    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
+    ok = httpb:close(Conn).
 
 req_head_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
