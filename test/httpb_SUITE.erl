@@ -7,6 +7,7 @@
 
 -define(TIMEOUT, 1000).
 -define(HELLO, "Hello world.\r\n").
+-define(BODY_SANS_NL, "Body without\r\nterminating newline.").
 
 all() ->
     [
@@ -32,12 +33,14 @@ basic() ->
         req_res_timeout,
         req_res_not_found,
         req_res_body,
+        req_res_body_sans_nl,
         req_res_body_source,
         req_res_example_com,
         req_head_res,
         req_query_res,
         req_options_res,
         req_options_star_res,
+        req_pre_flight_post_res,
         req_trace_res,
         req_res_chunks,
         req_res_req_res,
@@ -63,12 +66,14 @@ ssl() ->
         req_res_timeout,
         req_res_not_found,
         req_res_body,
+        req_res_body_sans_nl,
         req_res_body_source,
         req_res_example_com,
         req_head_res,
         req_query_res,
         req_options_res,
         req_options_star_res,
+        req_pre_flight_post_res,
         req_trace_res,
         req_res_chunks,
         req_res_req_res,
@@ -124,6 +129,9 @@ end_per_group(Group, Config) ->
 
 init_per_testcase(req_res_example_com, _Config) ->
     {skip, external_network};
+
+init_per_testcase(req_pre_flight_post_res, _Config) ->
+    {skip, httpd_closes_socket};
 
 init_per_testcase(_Test, Config) ->
     Config.
@@ -220,6 +228,13 @@ req_res_body_source(Config) ->
     ok = httpb:close(Conn),
     true = httpb:body_length(Result) =:= httpb:content_length(Result).
 
+req_res_body_sans_nl(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008/body_sans_nl", #{}, <<>>),
+    {ok, #{status := 200, body := <<?BODY_SANS_NL>>}} = httpb:response(Conn),
+    ok = httpb:close(Conn).
+
 req_res_example_com(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
@@ -249,7 +264,7 @@ req_options_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/hello", #{}, <<>>),
-    % httpd does not support OPTIONS yet.
+    % httpd does not support OPTIONS yet and closes the socket.
     {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
@@ -257,8 +272,23 @@ req_options_star_res(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/*", #{}, <<>>),
-    % httpd does not support OPTIONS yet.
+    % httpd does not support OPTIONS yet and closes the socket.
     {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_pre_flight_post_res(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/echo", #{}, <<>>),
+    % httpd does not support OPTIONS yet and closes the socket causing
+    % the following POST request on the same connection to fail.
+    ok = httpb:response(Conn, ?TIMEOUT),
+    Result = httpb:request(Conn, post, Scheme++"://localhost:8008/echo", #{
+        content_length => integer_to_binary(length(?HELLO)),
+        content_type => <<"text/plain">>
+    }, <<?HELLO>>),
+    {ok, Conn} = Result,
+    {ok, #{status := 200, body := <<?HELLO>>}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
 req_trace_res(Config) ->

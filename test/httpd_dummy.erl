@@ -2,8 +2,8 @@
 -behaviour(gen_server).
 
 -export([
-	start/0, start/1, start_link/1, stop/1, init/1, terminate/2,
-	handle_call/3, handle_cast/2, handle_info/2, do/1, reply_hello/2
+    start/0, start/1, start_link/1, stop/1, init/1, terminate/2,
+    handle_call/3, handle_cast/2, handle_info/2, do/1, reply_hello/2
 ]).
 
 -include_lib("inets/include/httpd.hrl").
@@ -78,6 +78,7 @@ reply_hello(Req = #mod{method = Method, request_uri = Uri}, _Args) ->
     {proceed, [{response, {response, [{code, Status}] ++ Headers, Body}}]}.
 
 -define(HELLO, "Hello world.\r\n").
+-define(BODY_SANS_NL, "Body without\r\nterminating newline.").
 
 -spec hello_dispatch(Req :: #mod{}, Method :: string(), Path :: string()) ->
     {Status :: integer(), Headers :: list(), Body :: list()}.
@@ -110,6 +111,16 @@ hello_dispatch(_Req, "GET", "/hello/timeout") ->
         {content_type, "text/plain"},
         {content_length, integer_to_list(length(?HELLO))}
     ], []}; % Missing body to force client side timeout.
+hello_dispatch(_Req, "HEAD", "/body_sans_nl") ->
+    {200, [
+        {content_type, "text/plain"},
+        {content_length, integer_to_list(length(?BODY_SANS_NL))}
+    ], []};
+hello_dispatch(_Req, "GET", "/body_sans_nl") ->
+    {200, [
+        {content_type, "text/plain"},
+        {content_length, integer_to_list(length(?BODY_SANS_NL))}
+    ], [?BODY_SANS_NL]};
 hello_dispatch(_Req, "GET", "/chunky") ->
     {200, [
         {content_type, "text/plain"},
