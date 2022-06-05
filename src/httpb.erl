@@ -73,7 +73,14 @@ request(Method, Url, Hdrs, Body, Options) when is_atom(Method) ->
     case connect(Scheme, Host, Port, SocketOpts, Timeout) of
     {ok, Socket} ->
         Conn = #{scheme => Scheme, host => Host, port => Port, socket => Socket},
-        request(Conn, Method, Url, Hdrs, Body);
+        case request(Conn, Method, Url, Hdrs, Body) of
+        {error, Reason} ->
+            % Initial request failed, cleanup connection.
+            close(Conn),
+            {error, Reason};
+        Result ->
+            Result
+        end;
     Other ->
         Other
     end;
@@ -83,10 +90,10 @@ request(Conn, Method, Url, Hdrs, Body) when is_map(Conn) andalso is_list(Url) ->
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_map(Conn) ->
     UrlMap = uri_string:parse(Url),
     Path1 = case {Method, maps:get(path, UrlMap, <<"/">>)} of
-    {_, <<>>} ->
-        <<"/">>;
     {options, <<"/*">>} ->
         <<"*">>;
+    {_, <<>>} ->
+        <<"/">>;
     {_, Path0} ->
         Path0
     end,
