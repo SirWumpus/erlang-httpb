@@ -11,52 +11,30 @@
 
 all() ->
     [
-        {group, group_basic},
-        {group, group_ssl}
+        {group, group_http},
+        {group, group_https}
     ].
 
 groups() ->
     [
-        {group_basic, [shuffle], basic()},
-        {group_ssl, [shuffle], ssl()}
+        {group_http, [shuffle], tests_http()},
+        {group_https, [shuffle], tests_https()}
     ].
 
-basic() ->
+tests_http() ->
     [
-        already_closed,
-        is_keep_alive,
-        bad_connection,
-        has_body,
-        connect_fail,
-        req_close,
-        req_res,
-        req_res_timeout,
-        req_res_not_found,
-        req_res_body,
-        req_res_body_sans_nl,
-        req_res_body_source,
-        req_res_example_com,
-        req_head_res,
-        req_query_res,
-        req_options_res,
-        req_options_star_res,
-        req_pre_flight_post_res,
-        req_trace_res,
-        req_res_chunks,
-        req_res_req_res,
-        req_req_res_res,
-        req_put_res,
-        req_delete_res,
-        req_post_echo,
-        req_post_send_echo,
-        req_post_chunk_echo,
-        req_post_chunk_fail,
-        one_request
+        tcp_already_closed
+        | tests_common()
     ].
 
-ssl() ->
+tests_https() ->
     [
-        ssl_already_closed,
+        ssl_already_closed
+        | tests_common()
+    ].
+
+tests_common() ->
+    [
         is_keep_alive,
         bad_connection,
         has_body,
@@ -95,7 +73,7 @@ end_per_suite(_Config)->
     ct:pal(?INFO, "~s:~s", [?MODULE, ?FUNCTION_NAME]),
     ok.
 
-init_per_group(Group = group_basic, Config) ->
+init_per_group(Group = group_http, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     {ok, Server} = httpd_dummy:start(),
     [{server, Server}, {scheme, "http"}] ++ Config;
@@ -107,7 +85,7 @@ init_per_group(Group = group_basic, Config) ->
 %       -addext "subjectAltName=DNS:localhost" \
 %       -config /usr/share/examples/openssl/openssl.cnf
 %
-init_per_group(Group = group_ssl, Config) ->
+init_per_group(Group = group_https, Config) ->
     ct:pal(?INFO, "~s:~s ~p", [?MODULE, ?FUNCTION_NAME, Group]),
     {ok, Server} = httpd_dummy:start([
         {bind_address, {127,0,0,1}},
@@ -139,7 +117,7 @@ init_per_testcase(_Test, Config) ->
 end_per_testcase(_Test, Config) ->
     Config.
 
-already_closed(Config) ->
+tcp_already_closed(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Socket} = gen_tcp:connect("localhost", 8008, []),
