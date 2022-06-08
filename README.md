@@ -92,7 +92,7 @@ Given an already open connection, send a request.
 
 By design there is no help with the `content_length` header; its under the caller's control.  Its possible to specify a non-zero `content_length` and provide an initially empty body.  The caller should follow a successful request with `httpb:send(Connection, Body)`.
 
-The `Body` argument is ignored for `head` and `trace` methods.  To support `OPTIONS * HTTP/1.1`, specify a `Url` like `http://localhost/*`, which only applies to the `options` method.
+The `Body` argument is ignored for `head` and `trace` methods.  To support `OPTIONS * HTTP/1.1`, specify a `Url` without a path `http://localhost`, which only applies to the `options` method.
 
 - - -
 ### httpb:response(Connection) -> {ok, Result} | {error, Reason}

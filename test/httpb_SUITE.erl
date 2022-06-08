@@ -50,7 +50,8 @@ tests_common() ->
         req_head_res,
         req_query_res,
         req_options_res,
-        req_options_star_res,
+        req_options_star_res0,
+        req_options_star_res1,
         req_pre_flight_post_res,
         req_trace_res,
         req_res_chunks,
@@ -246,7 +247,15 @@ req_options_res(Config) ->
     {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
     ok = httpb:close(Conn).
 
-req_options_star_res(Config) ->
+req_options_star_res0(Config) ->
+    Scheme = proplists:get_value(scheme, Config),
+    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
+    {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008", #{}, <<>>),
+    % httpd does not support OPTIONS yet and closes the socket.
+    {ok, #{status := 501}} = httpb:response(Conn, ?TIMEOUT),
+    ok = httpb:close(Conn).
+
+req_options_star_res1(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(options, Scheme++"://localhost:8008/*", #{}, <<>>),

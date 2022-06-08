@@ -89,8 +89,10 @@ request(Conn, Method, Url, Hdrs, Body) when is_map(Conn) andalso is_list(Url) ->
     request(Conn, Method, list_to_binary(Url), Hdrs, Body);
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) when is_map(Conn) ->
     UrlMap = uri_string:parse(Url),
-    Path1 = case {Method, maps:get(path, UrlMap, <<"/">>)} of
+    Path1 = case {Method, maps:get(path, UrlMap)} of
     {options, <<"/*">>} ->
+        <<"*">>;
+    {options, <<>>} ->
         <<"*">>;
     {_, <<>>} ->
         <<"/">>;
