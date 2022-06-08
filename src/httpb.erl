@@ -318,7 +318,13 @@ response(#{socket := Socket} = Conn, Timeout, Res) ->
                 Other
             end;
         false ->
-            % Stop reading before first chunk.
+            % Either response has no body or there are chunks to follow,
+            % in which case caller invokes recv_chunk/2 as needed.
+            %
+            % Poor man's websockets: If the request body was chunked and
+            % the response body is chunked then its possible to send a
+            % custom server chunked messages and receive chunked messages
+            % or replies.  Seen this done is a real application.
             {ok, Res}
         end;
     Other ->
