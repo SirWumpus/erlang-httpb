@@ -16,7 +16,7 @@ Data Types
 * Result            :: #{status => integer(), headers => headers(), body => body()}.
 * Socket            :: gen_tcp:socket() | ssl:sslsocket().
 * Options           :: #{socket_opts => proplists:proplist(), timeout => timeout()}.
-* Connection        :: #{scheme => http | https, host => string(), port => non_neg_integer(), socket => socket()}.
+* Connection        :: pid().
 
 
 Exports
@@ -30,16 +30,6 @@ Close the `Connection`.
 ### httpb:content_length(Headers) -> Length.
 
 Return the content length.
-
-- - -
-### httpb:controlling_process(Connection, Pid) -> ok | {error, Reason}
-
-See `gen_tcp:controlling_process/2` or `ssl:controlling_process/2`.
-
-- - -
-### httpb:getopts(Connection, Options) -> {ok, Options} | {error, Reason}
-
-See `inet:getopts/2` or `ssl:getopts/2`.
 
 - - -
 ### httpb:is_chunked(Headers) -> true | false
@@ -111,11 +101,6 @@ Send `Data` to the `Connection`.
 ### httpb:send_chunk(Connection, Data) -> ok | {error, Reason}
 
 Send `Data` as an HTTP formatted chunk to the `Connection`.
-
-- - -
-### httpb:setopts(Connection, Options) -> ok | {error, Reason}
-
-See `inet:setopts/2` or `ssl:setopts/2`.
 
 
 Examples
