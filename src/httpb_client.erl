@@ -7,7 +7,7 @@
 ]).
 
 % Exported, indirectly called by handle_call/3.  Do not call directly.
--export([close/1, recv/3, send/2, recv_chunk/2, send_chunk/2, request/5, response/2]).
+-export([recv/3, send/2, recv_chunk/2, send_chunk/2, request/5, response/2]).
 
 -ifdef(TEST).
 -export([expect_body/1]).
@@ -15,17 +15,10 @@
 
 -include("httpb.hrl").
 
--type packet()          :: binary()
-                         | {ok, {http_response, _, integer(), _}, binary()}
-                         | {ok, {http_header, _, string(), _, binary()}, binary()}
-                         | {ok, {http_error, binary()}, binary()}
-                         | {ok, http_eoh, binary()}
-                         | {more, non_neg_integer() | undefined}
-                         | error().
-
--type ret_ok()          :: {ok | error(), connection()}.
--type ret_data()        :: {{ok, binary()} | error(), connection()}.
--type ret_result()      :: {{ok, result()} | error(), connection()}.
+-type ret_ok_state()        :: {ret_ok(), state()}.
+-type ret_pid_state()       :: {{ok, pid()} | error(), state()}.
+-type ret_data_state()      :: {ret_data(), state()}.
+-type ret_result_state()    :: {ret_result(), state()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server callbacks.
@@ -40,8 +33,8 @@ init({Url, Options}) ->
     Port = maps:get(port, UriMap, scheme_to_port(Scheme)),
     case connect(Scheme, Host, Port, SocketOpts, Timeout) of
     {ok, Socket} ->
-        Conn = #{scheme => Scheme, host => Host, port => Port, socket => Socket},
-        {ok, Conn};
+        State = #{scheme => Scheme, host => Host, port => Port, socket => Socket},
+        {ok, State};
     {error, Reason} ->
         {stop, Reason}
     end.
@@ -49,15 +42,12 @@ init({Url, Options}) ->
 terminate(_Reason, _State) ->
     ok.
 
+handle_call(close, _From, State) ->
+    {stop, normal, close(State), #{}};
+
 handle_call({Fun, Args}, _From, State0) ->
     {Result, State1} = erlang:apply(Fun, [State0 | Args]),
-    case maps:size(State1) of
-    0 ->
-        % close/1 will close the socket and return an empty state.
-        {stop, normal, Result, #{}};
-    _ ->
-        {reply, Result, State1}
-    end;
+    {reply, Result, State1};
 
 handle_call(Request, _From, State) ->
     % Unknown request, no change.
@@ -141,7 +131,7 @@ connect(https, Host, Port, Options, Timeout) ->
     ssl:start(),
     ssl:connect(Host, Port, [binary, {active, false} | Options], Timeout).
 
--spec setopts(connection(), proplists:proplist()) -> ok | error().
+-spec setopts(state(), proplists:proplist()) -> ok | error().
 setopts(#{scheme := http, socket := Socket}, Options) ->
     inet:setopts(Socket, Options);
 setopts(#{scheme := https, socket := Socket}, Options) ->
@@ -163,19 +153,19 @@ expect_body(Res) ->
 % Exported, indirectly called by handle_call/3.  Do not call directly.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec close(connection()) -> ret_ok().
+-spec close(state()) -> ret_ok().
 close(#{scheme := http, socket := Socket}) ->
-    {gen_tcp:close(Socket), #{}};
+    gen_tcp:close(Socket);
 close(#{scheme := https, socket := Socket}) ->
-    {ssl:close(Socket), #{}}.
+    ssl:close(Socket).
 
--spec recv(connection(), non_neg_integer(), timeout()) -> ret_data().
+-spec recv(state(), non_neg_integer(), timeout()) -> ret_data_state().
 recv(#{scheme := http, socket := Socket} = Conn, Length, Timeout) ->
     {gen_tcp:recv(Socket, Length, Timeout), Conn};
 recv(#{scheme := https, socket := Socket} = Conn, Length, Timeout) ->
     {ssl:recv(Socket, Length, Timeout), Conn}.
 
--spec send(connection(), binary()) -> ret_ok().
+-spec send(state(), binary()) -> ret_ok_state().
 send(Conn, <<>>) ->
     {ok, Conn};
 send(#{scheme := http, socket := Socket} = Conn, Data) ->
@@ -185,7 +175,7 @@ send(#{scheme := https, socket := Socket} = Conn, Data) ->
 
 %%%% TODO check Conn.raw
 
--spec recv_chunk(connection(), timeout()) -> ret_data().
+-spec recv_chunk(state(), timeout()) -> ret_data_state().
 recv_chunk(#{socket := Socket} = Conn, Timeout) ->
     ok = setopts(Conn, [{active, once}, {packet, line}]),
     receive
@@ -219,7 +209,7 @@ recv_chunk(#{socket := Socket} = Conn, Timeout) ->
         {{error, timeout}, Conn}
     end.
 
--spec send_chunk(connection(), binary()) -> ret_ok().
+-spec send_chunk(state(), binary()) -> ret_ok_state().
 send_chunk(Conn, Data) ->
     Hex = integer_to_binary(byte_size(Data), 16),
     case send(Conn, <<Hex/binary, "\r\n">>) of
@@ -229,7 +219,7 @@ send_chunk(Conn, Data) ->
         {Other, Conn}
     end.
 
--spec request(connection(), method(), url(), headers(), body()) -> ret_ok().
+-spec request(state(), method(), url(), headers(), body()) -> ret_pid_state().
 request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
     UrlMap = uri_string:parse(Url),
 %io:format(standard_error, "woot ~p ~p~n", [Url, UrlMap]),
@@ -266,7 +256,7 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
         {Other, Conn}
     end.
 
--spec response(connection(), timeout()) -> ret_result().
+-spec response(state(), timeout()) -> ret_result_state().
 response(Conn, Timeout) ->
     % First request or pipelined requests?
     do_data(Conn, Timeout, #{
@@ -274,7 +264,7 @@ response(Conn, Timeout) ->
         mode => status, method => maps:get(method, Conn)
     }, maps:get(carry_over, Conn, <<>>)).
 
--spec response(connection(), timeout(), result()) -> ret_result().
+-spec response(state(), timeout(), result()) -> ret_result_state().
 response(#{socket := Socket} = Conn, Timeout, Res) ->
     receive
     {ssl_error, Socket, Reason} ->
@@ -299,7 +289,7 @@ response(#{socket := Socket} = Conn, Timeout, Res) ->
         {{error, timeout}, Conn}
     end.
 
--spec do_data(connection(), timeout(), result(), packet()) -> ret_result().
+-spec do_data(state(), timeout(), result(), packet()) -> ret_result_state().
 do_data(Conn, Timeout, Res, Data) ->
     case do_packet(Res, Data) of
     {more, Res1, Rest} ->

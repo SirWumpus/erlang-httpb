@@ -18,11 +18,6 @@
 
 -include("httpb.hrl").
 
--type ret_ok()          :: ok | error().
--type ret_data()        :: {ok, binary()} | error().
--type ret_conn()        :: {ok, pid()} | error().
--type ret_result()      :: {ok, result()} | error().
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -34,7 +29,7 @@ close(Pid) ->
         % The process for the connection no longer exists, we're done.
         ok;
     _ ->
-        gen_server:call(Pid, {fun httpb_client:close/1, []})
+        gen_server:call(Pid, close)
     end.
 
 -spec recv(pid(), Length :: non_neg_integer()) -> ret_data().
