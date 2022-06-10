@@ -8,7 +8,7 @@
     ssl
    ]},
   {env,[]},
-  {modules, [httpb]},
+  {modules, [httpb, httpb_client]},
   {files,["README.md","LICENSE","Makefile","rebar.config","priv","src","test"]},
 
   {licenses, ["MIT"]},

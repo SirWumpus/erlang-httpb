@@ -17,27 +17,15 @@ all() ->
 
 groups() ->
     [
-        {group_http, [shuffle], tests_http()},
-        {group_https, [shuffle], tests_https()}
-    ].
-
-tests_http() ->
-    [
-        tcp_already_closed
-        | tests_common()
-    ].
-
-tests_https() ->
-    [
-        ssl_already_closed
-        | tests_common()
+        {group_http, [shuffle], tests_common()},
+        {group_https, [shuffle], tests_common()}
     ].
 
 tests_common() ->
     [
+        already_closed,
         is_keep_alive,
-        bad_connection,
-        has_body,
+        expect_body,
         connect_fail,
         req_close,
         req_res,
@@ -118,19 +106,12 @@ init_per_testcase(_Test, Config) ->
 end_per_testcase(_Test, Config) ->
     Config.
 
-tcp_already_closed(Config) ->
+already_closed(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
-    {ok, Socket} = gen_tcp:connect("localhost", 8008, []),
-    ok = gen_tcp:close(Socket),
-    ok = httpb:close(#{scheme => http, socket => Socket}).
-
-ssl_already_closed(Config) ->
-    Scheme = proplists:get_value(scheme, Config),
-    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
-    {ok, Socket} = ssl:connect("localhost", 8008, []),
-    ok = ssl:close(Socket),
-    ok = httpb:close(#{scheme => https, socket => Socket}).
+    {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008", #{}, <<>>),
+    ok = httpb:close(Conn),
+    ok = httpb:close(Conn).
 
 is_keep_alive(Config) ->
     Scheme = proplists:get_value(scheme, Config),
@@ -140,24 +121,18 @@ is_keep_alive(Config) ->
     false = httpb:is_keep_alive(#{connection => <<"close">>}),
     false = httpb:is_keep_alive(#{headers => #{connection => <<"close">>}}).
 
-bad_connection(Config) ->
+expect_body(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
-    {error, bad_connection} = httpb:getopts(woot, #{}),
-    {error, bad_connection} = httpb:setopts(woot, #{}).
-
-has_body(Config) ->
-    Scheme = proplists:get_value(scheme, Config),
-    ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
-    false = httpb:has_body(#{method => head}, #{}),
-    false = httpb:has_body(#{}, #{}),
-    false = httpb:has_body(#{}, #{status => 204}),
-    false = httpb:has_body(#{}, #{status => 304}),
-    false = httpb:has_body(#{}, #{status => 199}),
-    false = httpb:has_body(#{}, #{transfer_encoding => <<"chunked">>}),
-    true  = httpb:has_body(#{}, #{content_length => <<"123">>}),
-    false = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"chunked">>}),
-    true  = httpb:has_body(#{}, #{content_length => <<"123">>, transfer_encoding => <<"identity">>}).
+    false = httpb_client:expect_body(#{}),
+    false = httpb_client:expect_body(#{method => head}),
+    false = httpb_client:expect_body(#{status => 204}),
+    false = httpb_client:expect_body(#{status => 304}),
+    false = httpb_client:expect_body(#{status => 199}),
+    false = httpb_client:expect_body(#{transfer_encoding => <<"chunked">>}),
+    true  = httpb_client:expect_body(#{content_length => <<"123">>}),
+    false = httpb_client:expect_body(#{content_length => <<"123">>, transfer_encoding => <<"chunked">>}),
+    true  = httpb_client:expect_body(#{content_length => <<"123">>, transfer_encoding => <<"identity">>}).
 
 connect_fail(Config) ->
     Scheme = proplists:get_value(scheme, Config),
@@ -175,7 +150,6 @@ req_res(Config) ->
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(get, Scheme++"://localhost:8008", #{}, <<>>),
     {ok, #{status := 204, body := <<>>}} = httpb:response(Conn, ?TIMEOUT),
-    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
     ok = httpb:close(Conn).
 
 req_res_timeout(Config) ->
@@ -218,9 +192,7 @@ req_res_example_com(Config) ->
     Scheme = proplists:get_value(scheme, Config),
     ct:pal(?INFO, "~s:~s ~s", [?MODULE, ?FUNCTION_NAME, Scheme]),
     {ok, Conn} = httpb:request(get, Scheme++"://example.com/", #{}, <<>>),
-    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
     {ok, #{status := 200}} = httpb:response(Conn, ?TIMEOUT),
-    {ok, [{active, false}]} = httpb:getopts(Conn, [active]),
     ok = httpb:close(Conn).
 
 req_head_res(Config) ->
