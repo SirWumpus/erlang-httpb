@@ -31,8 +31,8 @@
                            }.
 
 -type ret_ok()          :: ok | error().
--type ret_data()        :: {ok, binary()} | error().
 -type ret_conn()        :: {ok, pid()} | error().
+-type ret_data()        :: {ok, binary()} | error().
 -type ret_result()      :: {ok, result()} | error().
 
 -define(DEFAULT_TIMEOUT, 30000).

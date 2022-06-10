@@ -6,9 +6,6 @@
     init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2
 ]).
 
-% Exported, indirectly called by handle_call/3.  Do not call directly.
--export([recv/3, send/2, recv_chunk/2, send_chunk/2, request/5, response/2]).
-
 -ifdef(TEST).
 -export([expect_body/1]).
 -endif.
@@ -45,8 +42,28 @@ terminate(_Reason, _State) ->
 handle_call(close, _From, State) ->
     {stop, normal, close(State), #{}};
 
-handle_call({Fun, Args}, _From, State0) ->
-    {Result, State1} = erlang:apply(Fun, [State0 | Args]),
+handle_call({send, Data}, _From, State) ->
+    Result = send(State, Data),
+    {reply, Result, State};
+
+handle_call({send_chunk, Data}, _From, State) ->
+    Result = send_chunk(State, Data),
+    {reply, Result, State};
+
+handle_call({recv, Length, Timeout}, _From, State) ->
+    {Result, State1} = recv(State, Length, Timeout),
+    {reply, Result, State1};
+
+handle_call({recv_chunk, Timeout}, _From, State) ->
+    {Result, State1} = recv_chunk(State, Timeout),
+    {reply, Result, State1};
+
+handle_call({request, Method, Url, Headers, Body}, _From, State) ->
+    {Result, State1} = request(State, Method, Url, Headers, Body),
+    {reply, Result, State1};
+
+handle_call({response, Timeout}, _From, State) ->
+    {Result, State1} = response(State, Timeout),
     {reply, Result, State1};
 
 handle_call(Request, _From, State) ->
@@ -150,7 +167,7 @@ expect_body(Res) ->
     httpb:is_chunked(Res) == false andalso httpb:content_length(Res) > 0.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Exported, indirectly called by handle_call/3.  Do not call directly.
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec close(state()) -> ret_ok().
@@ -165,13 +182,11 @@ recv(#{scheme := http, socket := Socket} = Conn, Length, Timeout) ->
 recv(#{scheme := https, socket := Socket} = Conn, Length, Timeout) ->
     {ssl:recv(Socket, Length, Timeout), Conn}.
 
--spec send(state(), binary()) -> ret_ok_state().
-send(Conn, <<>>) ->
-    {ok, Conn};
-send(#{scheme := http, socket := Socket} = Conn, Data) ->
-    {gen_tcp:send(Socket, Data), Conn};
-send(#{scheme := https, socket := Socket} = Conn, Data) ->
-    {ssl:send(Socket, Data), Conn}.
+-spec send(state(), binary()) -> ret_ok().
+send(#{scheme := http, socket := Socket}, Data) ->
+    gen_tcp:send(Socket, Data);
+send(#{scheme := https, socket := Socket}, Data) ->
+    ssl:send(Socket, Data).
 
 %%%% TODO check Conn.raw
 
@@ -209,14 +224,14 @@ recv_chunk(#{socket := Socket} = Conn, Timeout) ->
         {{error, timeout}, Conn}
     end.
 
--spec send_chunk(state(), binary()) -> ret_ok_state().
-send_chunk(Conn, Data) ->
+-spec send_chunk(state(), binary()) -> ret_ok().
+send_chunk(State, Data) ->
     Hex = integer_to_binary(byte_size(Data), 16),
-    case send(Conn, <<Hex/binary, "\r\n">>) of
-    {ok, _} ->
-        send(Conn, <<Data/binary, "\r\n">>);
+    case send(State, <<Hex/binary, "\r\n">>) of
+    ok ->
+        send(State, <<Data/binary, "\r\n">>);
     Other ->
-        {Other, Conn}
+        Other
     end.
 
 -spec request(state(), method(), url(), headers(), body()) -> ret_pid_state().
@@ -237,7 +252,7 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
     Req0 = <<(method(Method))/binary, " ", (path(Path1, Query))/binary, " HTTP/1.1\r\n">>,
     Req1 = headers(Req0, Hdrs#{host => <<Host/binary, $:, (integer_to_binary(Port))/binary>>}),
     case send(Conn, Req1) of
-    {ok, Conn} ->
+    ok ->
         Conn1 = Conn#{method => Method},
         case Method of
         head ->
@@ -246,7 +261,7 @@ request(#{host := Host, port := Port} = Conn, Method, Url, Hdrs, Body) ->
             {{ok, self()}, Conn1};
         _ ->
             case send(Conn1, Body) of
-            {ok, Conn1} ->
+            ok ->
                 {{ok, self()}, Conn1};
             Other ->
                 {Other, Conn1}

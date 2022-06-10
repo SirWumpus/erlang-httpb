@@ -38,11 +38,11 @@ recv(Pid, Length) ->
 
 -spec recv(pid(), Length :: non_neg_integer(), Timeout :: timeout()) -> ret_data().
 recv(Pid, Length, Timeout) ->
-    gen_server:call(Pid, {fun httpb_client:recv/3, [Length, Timeout]}).
+    gen_server:call(Pid, {recv, Length, Timeout}).
 
 -spec send(pid(), Data :: binary()) -> ret_ok().
 send(Pid, Data) ->
-    gen_server:call(Pid, {fun httpb_client:send/2, [Data]}).
+    gen_server:call(Pid, {send, Data}).
 
 -spec recv_chunk(pid()) -> ret_data().
 recv_chunk(Pid) ->
@@ -50,7 +50,7 @@ recv_chunk(Pid) ->
 
 -spec recv_chunk(pid(), Timeout :: timeout()) -> ret_data().
 recv_chunk(Pid, Timeout) ->
-    gen_server:call(Pid, {fun httpb_client:recv_chunk/2, [Timeout]}).
+    gen_server:call(Pid, {recv_chunk, Timeout}).
 
 -spec send_chunk(pid(), Data :: binary()) -> ret_ok().
 send_chunk(Pid, Chunk) ->
@@ -58,7 +58,7 @@ send_chunk(Pid, Chunk) ->
     undefined ->
         {error, closed};
     _ ->
-        gen_server:call(Pid, {fun httpb_client:send_chunk/2, [Chunk]})
+        gen_server:call(Pid, {send_chunk, Chunk})
     end.
 
 -spec request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_conn().
@@ -87,7 +87,7 @@ request(Method, Url, Hdrs, Body, Options) when is_atom(Method) ->
 request(Pid, Method, Url, Hdrs, Body) when is_pid(Pid) andalso is_list(Url) ->
     request(Pid, Method, list_to_binary(Url), Hdrs, Body);
 request(Pid, Method, Url, Hdrs, Body) when is_pid(Pid) ->
-    gen_server:call(Pid, {fun httpb_client:request/5, [Method, Url, Hdrs, Body]});
+    gen_server:call(Pid, {request, Method, Url, Hdrs, Body});
 request(_, _, _, _,_) ->
     {error, badarg}.
 
@@ -97,7 +97,7 @@ response(Pid) ->
 
 -spec response(pid(), timeout()) -> ret_result().
 response(Pid, Timeout) ->
-    gen_server:call(Pid, {fun httpb_client:response/2, [Timeout]}).
+    gen_server:call(Pid, {response, Timeout}).
 
 -spec one_request(Method :: method(), Url :: url(), Hdrs :: headers(), Body :: body()) -> ret_result().
 one_request(Method, Url, Hdrs, Body) ->
